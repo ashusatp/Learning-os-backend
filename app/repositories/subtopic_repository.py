@@ -1,0 +1,39 @@
+import logging
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.subtopic import SubTopic
+
+logger = logging.getLogger(__name__)
+
+
+class SubTopicRepository:
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get_by_id(self, subtopic_id: UUID):
+        result = await self.db.get(SubTopic, subtopic_id)
+        return result
+
+    async def get_by_topic(self, topic_id: UUID):
+        query = select(SubTopic).where(
+            SubTopic.topic_id == topic_id
+        ).order_by(SubTopic.order, SubTopic.created_at)
+        result = await self.db.execute(query)
+        return result.scalars().all()
+
+    async def create(self, subtopic: SubTopic):
+        self.db.add(subtopic)
+        await self.db.flush()
+        return subtopic
+
+    async def update(self, subtopic: SubTopic):
+        await self.db.flush()
+        return subtopic
+
+    async def delete(self, subtopic: SubTopic):
+        await self.db.delete(subtopic)
+        await self.db.flush()
