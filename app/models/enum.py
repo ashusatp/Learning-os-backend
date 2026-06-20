@@ -21,3 +21,12 @@ class DifficultyLevel(str, Enum):
     EASY = "EASY"
     MEDIUM = "MEDIUM"
     HARD = "HARD"
+
+
+class MistakeType(str, Enum):
+    CONCEPTUAL = "CONCEPTUAL"
+    SILLY = "SILLY"
+    CALCULATION = "CALCULATION"
+    MISREAD = "MISREAD"
+    TIME_PRESSURE = "TIME_PRESSURE"
+    OTHER = "OTHER"

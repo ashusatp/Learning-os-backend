@@ -70,3 +70,9 @@ class SubTopic(Base):
         back_populates="subtopic",
         cascade="all, delete-orphan",
     )
+
+    mistakes = relationship(
+        "Mistake",
+        back_populates="subtopic",
+        cascade="all, delete-orphan",
+    )

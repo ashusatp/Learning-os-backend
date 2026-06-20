@@ -69,3 +69,8 @@ class Question(Base):
         cascade="all, delete-orphan",
         order_by="QuestionOption.order",
     )
+
+    mistakes = relationship(
+        "Mistake",
+        back_populates="question",
+    )
