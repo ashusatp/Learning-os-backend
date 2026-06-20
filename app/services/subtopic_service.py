@@ -60,7 +60,7 @@ class SubTopicService:
             await self.subtopic_repository.create(subtopic)
 
             await db.commit()
-            await db.refresh(subtopic)
+            await db.refresh(subtopic, ["files"])
 
             logger.info(f"SubTopic created: {name} for topic {topic_id}")
 
@@ -111,7 +111,7 @@ class SubTopicService:
             await self.subtopic_repository.update(subtopic)
 
             await db.commit()
-            await db.refresh(subtopic)
+            await db.refresh(subtopic, ["files"])
 
             logger.info(f"SubTopic updated: {subtopic_id}")
 
@@ -199,7 +199,7 @@ class SubTopicService:
             await self.subtopic_repository.update(subtopic)
 
             await db.commit()
-            await db.refresh(subtopic)
+            await db.refresh(subtopic, ["files"])
 
             logger.info(f"Revision recorded for subtopic: {subtopic_id}")
 
@@ -242,7 +242,7 @@ class SubTopicService:
             await self.subtopic_repository.update(subtopic)
 
             await db.commit()
-            await db.refresh(subtopic)
+            await db.refresh(subtopic, ["files"])
 
             logger.info(f"Performance updated for subtopic: {subtopic_id}")
 
@@ -312,7 +312,7 @@ class SubTopicService:
 
             await self.subtopic_repository.update(subtopic)
             await db.commit()
-            await db.refresh(subtopic)
+            await db.refresh(subtopic, ["files"])
 
             logger.info(f"Stats updated for subtopic: {subtopic_id}")
             return await self.get_stats(subtopic_id)
@@ -354,7 +354,7 @@ class SubTopicService:
             await self.subtopic_repository.update(subtopic)
 
             await db.commit()
-            await db.refresh(subtopic)
+            await db.refresh(subtopic, ["files"])
 
             logger.info(f"Notes saved for subtopic: {subtopic_id}")
 
