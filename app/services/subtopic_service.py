@@ -3,11 +3,14 @@ import os
 from datetime import datetime, timezone
 from uuid import UUID
 
+from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.exceptions.custom_exceptions import NotFoundException
 from app.models.subtopic import SubTopic
 from app.models.subtopic_file import SubtopicFile
+from app.models.question import Question
+from app.models.mistake import Mistake
 from app.repositories.subtopic_repository import SubTopicRepository
 from app.repositories.subtopic_file_repository import SubtopicFileRepository
 from app.repositories.topic_repository import TopicRepository
@@ -211,6 +214,11 @@ class SubTopicService:
             logger.exception(f"Error while recording revision: {subtopic_id}")
             raise
 
+    async def record_revision_stats(self, subtopic_id: UUID):
+        """Record revision and return stats."""
+        await self.record_revision(subtopic_id)
+        return await self.get_stats(subtopic_id)
+
     async def update_performance(
         self,
         subtopic_id: UUID,
@@ -247,6 +255,75 @@ class SubTopicService:
         except Exception:
             await db.rollback()
             logger.exception(f"Error while updating performance: {subtopic_id}")
+            raise
+
+    # ── Stats ──
+
+    async def get_stats(self, subtopic_id: UUID):
+        subtopic = await self.get_subtopic(subtopic_id)
+        db = self.subtopic_repository.db
+
+        # Question count
+        q_count = await db.execute(
+            select(func.count()).select_from(Question).where(Question.subtopic_id == subtopic_id)
+        )
+        question_count = q_count.scalar()
+
+        # Mistake counts
+        total_q = await db.execute(
+            select(func.count()).select_from(Mistake).where(Mistake.subtopic_id == subtopic_id)
+        )
+        total_mistakes = total_q.scalar()
+
+        resolved_q = await db.execute(
+            select(func.count()).select_from(Mistake).where(
+                Mistake.subtopic_id == subtopic_id,
+                Mistake.is_resolved == True,
+            )
+        )
+        resolved_mistakes = resolved_q.scalar()
+
+        return {
+            "mastery_level": subtopic.mastery_level,
+            "confidence_level": subtopic.confidence_level,
+            "revision_count": subtopic.revision_count,
+            "last_revised_at": subtopic.last_revised_at,
+            "question_count": question_count,
+            "total_mistakes": total_mistakes,
+            "unresolved_mistakes": total_mistakes - resolved_mistakes,
+            "resolved_mistakes": resolved_mistakes,
+            "created_at": subtopic.created_at,
+            "updated_at": subtopic.updated_at,
+        }
+
+    async def update_stats(self, subtopic_id: UUID, **kwargs):
+        db = self.subtopic_repository.db
+
+        try:
+            subtopic = await self.get_subtopic(subtopic_id)
+
+            for key, value in kwargs.items():
+                if value is not None:
+                    setattr(subtopic, key, value)
+
+            await self.subtopic_repository.update(subtopic)
+            await db.commit()
+            await db.refresh(subtopic)
+
+            logger.info(f"Stats updated for subtopic: {subtopic_id}")
+            return await self.get_stats(subtopic_id)
+
+        except NotFoundException:
+            raise
+
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while updating stats: {subtopic_id}")
+            raise
+
+        except Exception:
+            await db.rollback()
+            logger.exception(f"Error while updating stats: {subtopic_id}")
             raise
 
     # ── Notes ──

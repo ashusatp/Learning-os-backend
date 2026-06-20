@@ -47,6 +47,24 @@ class SubtopicFileResponse(BaseModel):
         from_attributes = True
 
 
+class SubtopicStatsResponse(BaseModel):
+    mastery_level: MasteryLevel
+    confidence_level: float
+    revision_count: int
+    last_revised_at: datetime | None
+    question_count: int
+    total_mistakes: int
+    unresolved_mistakes: int
+    resolved_mistakes: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class UpdateStatsRequest(BaseModel):
+    mastery_level: MasteryLevel | None = None
+    confidence_level: float | None = None
+
+
 class SubTopicResponse(BaseModel):
     id: UUID
     topic_id: UUID

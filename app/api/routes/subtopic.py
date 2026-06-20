@@ -15,9 +15,11 @@ from app.schema.subtopic_schema import (
     CreateSubTopicRequest,
     UpdateSubTopicRequest,
     UpdatePerformanceRequest,
+    UpdateStatsRequest,
     ReorderSubTopicsRequest,
     SaveNotesRequest,
     SubTopicResponse,
+    SubtopicStatsResponse,
     SubtopicFileResponse,
 )
 from app.services.subtopic_service import SubTopicService
@@ -113,6 +115,37 @@ async def update_performance(
         questions_correct=payload.questions_correct,
         mistake_count=payload.mistake_count,
     )
+
+
+# ── Stats endpoints ──
+
+
+@router.get("/{subtopic_id}/stats", response_model=SubtopicStatsResponse)
+async def get_stats(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.get_stats(subtopic_id)
+
+
+@router.patch("/{subtopic_id}/stats", response_model=SubtopicStatsResponse)
+async def update_stats(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    payload: UpdateStatsRequest,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.update_stats(subtopic_id, **payload.model_dump(exclude_unset=True))
+
+
+@router.post("/{subtopic_id}/stats/revise", response_model=SubtopicStatsResponse)
+async def revise_stats(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.record_revision_stats(subtopic_id)
 
 
 # ── Notes endpoints ──
