@@ -4,7 +4,9 @@ from app.models.goal import Goal
 from app.models.subject import Subject
 from app.models.topic import Topic
 from app.models.subtopic import SubTopic
+from app.models.subtopic_folder import SubtopicFolder
 from app.models.subtopic_file import SubtopicFile
 from app.models.question import Question
 from app.models.question_option import QuestionOption
 from app.models.mistake import Mistake
+from app.models.issue import Issue
