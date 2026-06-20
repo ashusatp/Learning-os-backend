@@ -29,6 +29,14 @@ class SubtopicFile(Base):
 
     storage_path = Column(String, nullable=False)
 
+    folder_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("subtopic_folders.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     subtopic = relationship("SubTopic", back_populates="files")
+    folder = relationship("SubtopicFolder", back_populates="files")

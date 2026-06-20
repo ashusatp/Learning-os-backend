@@ -65,6 +65,12 @@ class SubTopic(Base):
         cascade="all, delete-orphan",
     )
 
+    folders = relationship(
+        "SubtopicFolder",
+        back_populates="subtopic",
+        cascade="all, delete-orphan",
+    )
+
     questions = relationship(
         "Question",
         back_populates="subtopic",

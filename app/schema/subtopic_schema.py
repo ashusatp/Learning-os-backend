@@ -37,6 +37,7 @@ class SaveNotesRequest(BaseModel):
 class SubtopicFileResponse(BaseModel):
     id: UUID
     subtopic_id: UUID
+    folder_id: UUID | None = None
     name: str
     original_name: str
     content_type: str
@@ -45,6 +46,43 @@ class SubtopicFileResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SubtopicFolderResponse(BaseModel):
+    id: UUID
+    subtopic_id: UUID
+    parent_id: UUID | None = None
+    name: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CreateFolderRequest(BaseModel):
+    name: str
+    parent_id: UUID | None = None
+
+
+class RenameFolderRequest(BaseModel):
+    name: str
+
+
+class MoveFolderRequest(BaseModel):
+    parent_id: UUID | None = None
+
+
+class MoveFileRequest(BaseModel):
+    folder_id: UUID | None = None
+
+
+class RenameFileRequest(BaseModel):
+    original_name: str
+
+
+class FolderContentsResponse(BaseModel):
+    folders: list[SubtopicFolderResponse]
+    files: list[SubtopicFileResponse]
 
 
 class SubtopicStatsResponse(BaseModel):

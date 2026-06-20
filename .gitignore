@@ -3,6 +3,8 @@
 .env.local
 .env.*.local
 
+uploads 
+
 # Virtual environment
 .venv/
 venv/

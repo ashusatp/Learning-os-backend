@@ -6,13 +6,15 @@ from uuid import UUID
 from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.exceptions.custom_exceptions import NotFoundException
+from app.exceptions.custom_exceptions import BadRequestException, NotFoundException
 from app.models.subtopic import SubTopic
 from app.models.subtopic_file import SubtopicFile
+from app.models.subtopic_folder import SubtopicFolder
 from app.models.question import Question
 from app.models.mistake import Mistake
 from app.repositories.subtopic_repository import SubTopicRepository
 from app.repositories.subtopic_file_repository import SubtopicFileRepository
+from app.repositories.subtopic_folder_repository import SubtopicFolderRepository
 from app.repositories.topic_repository import TopicRepository
 
 logger = logging.getLogger(__name__)
@@ -25,10 +27,12 @@ class SubTopicService:
         subtopic_repository: SubTopicRepository,
         topic_repository: TopicRepository,
         file_repository: SubtopicFileRepository,
+        folder_repository: SubtopicFolderRepository | None = None,
     ):
         self.subtopic_repository = subtopic_repository
         self.topic_repository = topic_repository
         self.file_repository = file_repository
+        self.folder_repository = folder_repository
 
     async def create_subtopic(
         self,
@@ -379,6 +383,7 @@ class SubTopicService:
         size: int,
         storage_path: str,
         disk_name: str,
+        folder_id: UUID | None = None,
     ):
         db = self.file_repository.db
 
@@ -393,6 +398,7 @@ class SubTopicService:
                 content_type=content_type,
                 size=size,
                 storage_path=storage_path,
+                folder_id=folder_id,
             )
 
             await self.file_repository.create(file_record)
@@ -417,7 +423,9 @@ class SubTopicService:
             logger.exception(f"Error while creating file record: {original_name}")
             raise
 
-    async def get_files(self, subtopic_id: UUID):
+    async def get_files(self, subtopic_id: UUID, folder_id=None, filter_folder: bool = False):
+        if filter_folder:
+            return await self.file_repository.get_by_subtopic(subtopic_id, folder_id=folder_id)
         return await self.file_repository.get_by_subtopic(subtopic_id)
 
     async def get_file(self, file_id: UUID):
@@ -454,4 +462,163 @@ class SubTopicService:
         except Exception:
             await db.rollback()
             logger.exception(f"Error while deleting file: {file_id}")
+            raise
+
+    async def move_file(self, file_id: UUID, folder_id: UUID | None):
+        db = self.file_repository.db
+
+        try:
+            file_record = await self.get_file(file_id)
+
+            if folder_id is not None:
+                folder = await self.folder_repository.get_by_id(folder_id)
+                if not folder:
+                    raise NotFoundException(f"Folder not found: {folder_id}")
+
+            file_record.folder_id = folder_id
+            await self.file_repository.update(file_record)
+            await db.commit()
+            await db.refresh(file_record)
+
+            logger.info(f"File {file_id} moved to folder {folder_id}")
+            return file_record
+
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while moving file: {file_id}")
+            raise
+
+    async def rename_file(self, file_id: UUID, original_name: str):
+        db = self.file_repository.db
+
+        try:
+            file_record = await self.get_file(file_id)
+            file_record.original_name = original_name
+            await self.file_repository.update(file_record)
+            await db.commit()
+            await db.refresh(file_record)
+
+            logger.info(f"File {file_id} renamed to {original_name}")
+            return file_record
+
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while renaming file: {file_id}")
+            raise
+
+    # ── Folders ──
+
+    async def create_folder(
+        self,
+        subtopic_id: UUID,
+        name: str,
+        parent_id: UUID | None = None,
+    ):
+        db = self.folder_repository.db
+
+        try:
+            await self.get_subtopic(subtopic_id)
+
+            if parent_id is not None:
+                parent = await self.folder_repository.get_by_id(parent_id)
+                if not parent:
+                    raise NotFoundException(f"Parent folder not found: {parent_id}")
+
+            folder = SubtopicFolder(
+                subtopic_id=subtopic_id,
+                parent_id=parent_id,
+                name=name,
+            )
+            await self.folder_repository.create(folder)
+            await db.commit()
+            await db.refresh(folder)
+
+            logger.info(f"Folder created: {name} for subtopic {subtopic_id}")
+            return folder
+
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while creating folder: {name}")
+            raise
+
+    async def get_folder(self, folder_id: UUID):
+        folder = await self.folder_repository.get_by_id(folder_id)
+        if not folder:
+            raise NotFoundException(f"Folder not found: {folder_id}")
+        return folder
+
+    async def get_folder_contents(self, subtopic_id: UUID, folder_id: UUID | None = None):
+        folders = await self.folder_repository.get_by_subtopic(subtopic_id, parent_id=folder_id)
+        files = await self.file_repository.get_by_subtopic(subtopic_id, folder_id=folder_id)
+        return {"folders": folders, "files": files}
+
+    async def rename_folder(self, folder_id: UUID, name: str):
+        db = self.folder_repository.db
+
+        try:
+            folder = await self.get_folder(folder_id)
+            folder.name = name
+            await self.folder_repository.update(folder)
+            await db.commit()
+            await db.refresh(folder)
+
+            logger.info(f"Folder {folder_id} renamed to {name}")
+            return folder
+
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while renaming folder: {folder_id}")
+            raise
+
+    async def move_folder(self, folder_id: UUID, parent_id: UUID | None):
+        db = self.folder_repository.db
+
+        try:
+            folder = await self.get_folder(folder_id)
+
+            if parent_id is not None:
+                if parent_id == folder_id:
+                    raise BadRequestException("Cannot move folder into itself")
+                parent = await self.folder_repository.get_by_id(parent_id)
+                if not parent:
+                    raise NotFoundException(f"Parent folder not found: {parent_id}")
+
+            folder.parent_id = parent_id
+            await self.folder_repository.update(folder)
+            await db.commit()
+            await db.refresh(folder)
+
+            logger.info(f"Folder {folder_id} moved to parent {parent_id}")
+            return folder
+
+        except (NotFoundException, BadRequestException):
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while moving folder: {folder_id}")
+            raise
+
+    async def delete_folder(self, folder_id: UUID):
+        db = self.folder_repository.db
+
+        try:
+            folder = await self.get_folder(folder_id)
+            await self.folder_repository.delete(folder)
+            await db.commit()
+
+            logger.info(f"Folder deleted: {folder_id}")
+
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while deleting folder: {folder_id}")
             raise

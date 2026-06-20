@@ -21,6 +21,13 @@ from app.schema.subtopic_schema import (
     SubTopicResponse,
     SubtopicStatsResponse,
     SubtopicFileResponse,
+    SubtopicFolderResponse,
+    CreateFolderRequest,
+    RenameFolderRequest,
+    MoveFolderRequest,
+    MoveFileRequest,
+    RenameFileRequest,
+    FolderContentsResponse,
 )
 from app.services.subtopic_service import SubTopicService
 
@@ -178,6 +185,7 @@ async def upload_file(
     topic_id: UUID,
     subtopic_id: UUID,
     file: UploadFile = File(...),
+    folder_id: UUID | None = None,
     service: SubTopicService = Depends(get_subtopic_service),
 ):
     max_bytes = configs.MAX_UPLOAD_SIZE_MB * 1024 * 1024
@@ -210,6 +218,7 @@ async def upload_file(
         size=len(content),
         storage_path=str(file_path),
         disk_name=disk_name,
+        folder_id=folder_id,
     )
 
 
@@ -239,6 +248,28 @@ async def download_file(
     )
 
 
+@router.patch("/{subtopic_id}/files/{file_id}/move", response_model=SubtopicFileResponse)
+async def move_file(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    file_id: UUID,
+    payload: MoveFileRequest,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.move_file(file_id, payload.folder_id)
+
+
+@router.patch("/{subtopic_id}/files/{file_id}/rename", response_model=SubtopicFileResponse)
+async def rename_file(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    file_id: UUID,
+    payload: RenameFileRequest,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.rename_file(file_id, payload.original_name)
+
+
 @router.delete("/{subtopic_id}/files/{file_id}", status_code=204)
 async def delete_file(
     topic_id: UUID,
@@ -247,3 +278,66 @@ async def delete_file(
     service: SubTopicService = Depends(get_subtopic_service),
 ):
     await service.delete_file(file_id)
+
+
+# ── Folder endpoints ──
+
+
+@router.post(
+    "/{subtopic_id}/folders",
+    response_model=SubtopicFolderResponse,
+    status_code=201,
+)
+async def create_folder(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    payload: CreateFolderRequest,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.create_folder(
+        subtopic_id=subtopic_id,
+        name=payload.name,
+        parent_id=payload.parent_id,
+    )
+
+
+@router.get("/{subtopic_id}/folders/contents", response_model=FolderContentsResponse)
+async def get_folder_contents(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    folder_id: UUID | None = None,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.get_folder_contents(subtopic_id, folder_id)
+
+
+@router.patch("/{subtopic_id}/folders/{folder_id}/rename", response_model=SubtopicFolderResponse)
+async def rename_folder(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    folder_id: UUID,
+    payload: RenameFolderRequest,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.rename_folder(folder_id, payload.name)
+
+
+@router.patch("/{subtopic_id}/folders/{folder_id}/move", response_model=SubtopicFolderResponse)
+async def move_folder(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    folder_id: UUID,
+    payload: MoveFolderRequest,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.move_folder(folder_id, payload.parent_id)
+
+
+@router.delete("/{subtopic_id}/folders/{folder_id}", status_code=204)
+async def delete_folder(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    folder_id: UUID,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    await service.delete_folder(folder_id)
