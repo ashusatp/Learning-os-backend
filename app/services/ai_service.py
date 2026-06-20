@@ -49,5 +49,8 @@ class AIService:
         ):
             yield chunk
 
-        await self.account_service.increment_ai_usage(user_id)
         logger.info(f"AI help stream completed for user: {user_id}")
+
+    async def record_usage(self, user_id: UUID):
+        """Call after streaming completes to increment the usage counter."""
+        await self.account_service.increment_ai_usage(user_id)

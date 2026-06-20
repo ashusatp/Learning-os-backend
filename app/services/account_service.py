@@ -69,6 +69,7 @@ class AccountService:
 
     async def validate_ai_access(self, user_id: UUID):
         """Validates that the user's account has AI enabled and is within rate limits."""
+        db = self.account_repository.db
         account = await self.get_account(user_id)
 
         if not account.ai_enabled:
@@ -79,6 +80,8 @@ class AccountService:
         if account.ai_requests_last_reset is None or account.ai_requests_last_reset.date() < now.date():
             account.ai_requests_today = 0
             account.ai_requests_last_reset = now
+            await self.account_repository.update(account)
+            await db.commit()
 
         if account.ai_requests_today >= configs.AI_RATE_LIMIT_PER_DAY:
             raise ForbiddenException(
