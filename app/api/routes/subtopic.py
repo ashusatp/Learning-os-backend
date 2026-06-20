@@ -110,7 +110,6 @@ async def update_performance(
 ):
     return await service.update_performance(
         subtopic_id=subtopic_id,
-        questions_solved=payload.questions_solved,
         questions_correct=payload.questions_correct,
         mistake_count=payload.mistake_count,
     )

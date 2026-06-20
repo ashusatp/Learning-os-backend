@@ -4,3 +4,5 @@ from app.models.subject import Subject
 from app.models.topic import Topic
 from app.models.subtopic import SubTopic
 from app.models.subtopic_file import SubtopicFile
+from app.models.question import Question
+from app.models.question_option import QuestionOption

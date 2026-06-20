@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import configs
 from app.core.logger import setup_logger
 from app.exceptions.register import register_exception_handlers
-from app.api.routes import auth, health, user, goal, subject, topic, subtopic
+from app.api.routes import auth, health, user, goal, subject, topic, subtopic, question
 
 setup_logger()
 
@@ -33,3 +33,4 @@ app.include_router(goal.router, prefix="/api/v1")
 app.include_router(subject.router, prefix="/api/v1")
 app.include_router(topic.router, prefix="/api/v1")
 app.include_router(subtopic.router, prefix="/api/v1")
+app.include_router(question.router, prefix="/api/v1")

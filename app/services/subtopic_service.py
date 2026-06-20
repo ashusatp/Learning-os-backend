@@ -214,7 +214,6 @@ class SubTopicService:
     async def update_performance(
         self,
         subtopic_id: UUID,
-        questions_solved: int,
         questions_correct: int,
         mistake_count: int,
     ):
@@ -224,9 +223,9 @@ class SubTopicService:
         try:
             subtopic = await self.get_subtopic(subtopic_id)
 
-            subtopic.questions_solved = questions_solved
             subtopic.questions_correct = questions_correct
             subtopic.mistake_count = mistake_count
+            subtopic.questions_solved = questions_correct + mistake_count
 
             await self.subtopic_repository.update(subtopic)
 

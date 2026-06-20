@@ -15,6 +15,8 @@ class UpdateSubTopicRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     order: int | None = None
+    mastery_level: MasteryLevel | None = None
+    confidence_level: float | None = None
 
 
 class ReorderSubTopicsRequest(BaseModel):
@@ -22,7 +24,6 @@ class ReorderSubTopicsRequest(BaseModel):
 
 
 class UpdatePerformanceRequest(BaseModel):
-    questions_solved: int
     questions_correct: int
     mistake_count: int
 

@@ -64,3 +64,9 @@ class SubTopic(Base):
         back_populates="subtopic",
         cascade="all, delete-orphan",
     )
+
+    questions = relationship(
+        "Question",
+        back_populates="subtopic",
+        cascade="all, delete-orphan",
+    )
