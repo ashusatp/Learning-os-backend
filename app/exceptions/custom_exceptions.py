@@ -31,3 +31,8 @@ class InvalidCredentialsException(AppException):
 class UnauthorizedException(AppException):
     status_code = 401
     message = "Not authenticated"
+
+
+class ForbiddenException(AppException):
+    status_code = 403
+    message = "Access denied"

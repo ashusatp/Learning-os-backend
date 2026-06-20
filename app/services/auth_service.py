@@ -3,6 +3,7 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.exceptions.custom_exceptions import AlreadyExistsException, BadRequestException, InvalidCredentialsException
+from app.models.account import Account
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.utils.hashing import hash_password, verify_password
@@ -35,6 +36,9 @@ class AuthService:
             )
 
             await self.user_repository.create(user)
+
+            account = Account(user_id=user.id)
+            db.add(account)
 
             await db.commit()
             await db.refresh(user)
@@ -135,6 +139,9 @@ class AuthService:
                         auth_provider_id=google_id,
                     )
                     await self.user_repository.create(user)
+
+                    account = Account(user_id=user.id)
+                    db.add(account)
 
             await db.commit()
             await db.refresh(user)

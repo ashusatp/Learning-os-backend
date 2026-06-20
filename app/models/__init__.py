@@ -1,4 +1,5 @@
 from app.models.user import User
+from app.models.account import Account
 from app.models.goal import Goal
 from app.models.subject import Subject
 from app.models.topic import Topic

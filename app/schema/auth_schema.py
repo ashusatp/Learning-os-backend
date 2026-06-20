@@ -29,8 +29,20 @@ class AuthUserResponse(BaseModel):
     id: UUID
     email: str
     name: str
+    ai_enabled: bool = False
     created_at: datetime
     updated_at: datetime
 
     class Config:
         from_attributes = True
+
+    @classmethod
+    def from_user(cls, user) -> "AuthUserResponse":
+        return cls(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            ai_enabled=user.account.ai_enabled if user.account else False,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+        )

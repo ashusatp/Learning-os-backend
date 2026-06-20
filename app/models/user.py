@@ -26,6 +26,13 @@ class User(Base):
 
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    account = relationship(
+        "Account",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
     goals = relationship(
         "Goal",
         back_populates="user",
