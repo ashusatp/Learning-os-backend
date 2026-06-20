@@ -2,10 +2,14 @@ import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
 from app.exceptions.custom_exceptions import AlreadyExistsException, BadRequestException, InvalidCredentialsException
 from app.models.account import Account
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
+from app.schema.auth_schema import AuthUserResponse
 from app.utils.hashing import hash_password, verify_password
 from app.utils.jwt import create_access_token
 
@@ -41,13 +45,18 @@ class AuthService:
             db.add(account)
 
             await db.commit()
-            await db.refresh(user)
+
+            # Reload user with account relationship
+            result = await db.execute(
+                select(User).options(selectinload(User.account)).where(User.id == user.id)
+            )
+            user = result.scalar_one()
 
             logger.info(f"User registered: {email}")
 
             token = create_access_token(user.id)
 
-            return {"access_token": token, "user": user}
+            return {"access_token": token, "user": AuthUserResponse.from_user(user)}
 
         except AlreadyExistsException:
             raise
@@ -64,6 +73,8 @@ class AuthService:
 
     async def login(self, email: str, password: str):
 
+        db = self.user_repository.db
+
         user = await self.user_repository.get_by_email(email)
 
         if not user:
@@ -72,11 +83,17 @@ class AuthService:
         if not verify_password(password, user.password_hash):
             raise InvalidCredentialsException()
 
+        # Reload with account relationship
+        result = await db.execute(
+            select(User).options(selectinload(User.account)).where(User.id == user.id)
+        )
+        user = result.scalar_one()
+
         logger.info(f"User logged in: {email}")
 
         token = create_access_token(user.id)
 
-        return {"access_token": token, "user": user}
+        return {"access_token": token, "user": AuthUserResponse.from_user(user)}
 
     async def google_auth(self, code: str):
         import httpx
@@ -144,13 +161,18 @@ class AuthService:
                     db.add(account)
 
             await db.commit()
-            await db.refresh(user)
+
+            # Reload with account relationship
+            result = await db.execute(
+                select(User).options(selectinload(User.account)).where(User.id == user.id)
+            )
+            user = result.scalar_one()
 
             logger.info(f"Google auth successful: {email}")
 
             jwt_token = create_access_token(user.id)
 
-            return {"access_token": jwt_token, "user": user}
+            return {"access_token": jwt_token, "user": AuthUserResponse.from_user(user)}
 
         except (BadRequestException, AlreadyExistsException):
             raise
