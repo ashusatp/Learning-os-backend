@@ -75,6 +75,15 @@ class QuestionService:
             raise NotFoundException(f"Subtopic not found: {subtopic_id}")
         return await self.question_repository.get_by_subtopic(subtopic_id)
 
+    async def get_questions_by_subtopic_paginated(self, subtopic_id: UUID, page: int, page_size: int):
+        subtopic = await self.subtopic_repository.get_by_id(subtopic_id)
+        if not subtopic:
+            raise NotFoundException(f"Subtopic not found: {subtopic_id}")
+        offset = (page - 1) * page_size
+        items, total = await self.question_repository.get_by_subtopic_paginated(subtopic_id, page_size, offset)
+        total_pages = (total + page_size - 1) // page_size
+        return {"items": items, "total": total, "page": page, "page_size": page_size, "total_pages": total_pages}
+
     async def update_question(self, question_id: UUID, **kwargs):
         db = self.question_repository.db
 

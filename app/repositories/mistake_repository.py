@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.mistake import Mistake
@@ -33,6 +33,20 @@ class MistakeRepository:
             query = query.where(Mistake.is_resolved == resolved)
         result = await self.db.execute(query)
         return result.scalars().all()
+
+    async def get_by_subtopic_paginated(
+        self, subtopic_id: UUID, resolved: bool | None, limit: int, offset: int
+    ):
+        base = select(Mistake).where(Mistake.subtopic_id == subtopic_id)
+        if resolved is not None:
+            base = base.where(Mistake.is_resolved == resolved)
+
+        count_result = await self.db.execute(select(func.count()).select_from(base.subquery()))
+        total = count_result.scalar()
+
+        query = base.order_by(Mistake.created_at.desc()).limit(limit).offset(offset)
+        result = await self.db.execute(query)
+        return result.scalars().all(), total
 
     async def get_by_goal(self, goal_id: UUID, resolved: bool | None = None):
         query = (

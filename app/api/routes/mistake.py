@@ -9,6 +9,7 @@ from app.schema.mistake_schema import (
     UpdateMistakeRequest,
     MistakeResponse,
 )
+from app.schema.pagination import PaginatedResponse
 from app.services.mistake_service import MistakeService
 
 logger = logging.getLogger(__name__)
@@ -31,13 +32,15 @@ async def create_mistake(
     return await service.create_mistake(subtopic_id=subtopic_id, **data)
 
 
-@subtopic_router.get("", response_model=list[MistakeResponse])
+@subtopic_router.get("", response_model=PaginatedResponse[MistakeResponse])
 async def get_mistakes(
     subtopic_id: UUID,
     resolved: bool | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     service: MistakeService = Depends(get_mistake_service),
 ):
-    return await service.get_mistakes_by_subtopic(subtopic_id, resolved)
+    return await service.get_mistakes_by_subtopic_paginated(subtopic_id, resolved, page, page_size)
 
 
 @subtopic_router.get("/{mistake_id}", response_model=MistakeResponse)

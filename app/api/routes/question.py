@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.api.dependencies.question_dependency import get_question_service
 from app.schema.question_schema import (
@@ -10,6 +10,7 @@ from app.schema.question_schema import (
     ReorderQuestionsRequest,
     QuestionResponse,
 )
+from app.schema.pagination import PaginatedResponse
 from app.services.question_service import QuestionService
 
 logger = logging.getLogger(__name__)
@@ -35,12 +36,14 @@ async def create_question(
     )
 
 
-@router.get("", response_model=list[QuestionResponse])
+@router.get("", response_model=PaginatedResponse[QuestionResponse])
 async def get_questions(
     subtopic_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     service: QuestionService = Depends(get_question_service),
 ):
-    return await service.get_questions_by_subtopic(subtopic_id)
+    return await service.get_questions_by_subtopic_paginated(subtopic_id, page, page_size)
 
 
 @router.put("/reorder", response_model=list[QuestionResponse])

@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -34,6 +34,22 @@ class QuestionRepository:
         )
         result = await self.db.execute(query)
         return result.scalars().all()
+
+    async def get_by_subtopic_paginated(self, subtopic_id: UUID, limit: int, offset: int):
+        count_query = select(func.count()).select_from(Question).where(Question.subtopic_id == subtopic_id)
+        count_result = await self.db.execute(count_query)
+        total = count_result.scalar()
+
+        query = (
+            select(Question)
+            .options(selectinload(Question.options))
+            .where(Question.subtopic_id == subtopic_id)
+            .order_by(Question.order, Question.created_at)
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await self.db.execute(query)
+        return result.scalars().all(), total
 
     async def create(self, question: Question):
         self.db.add(question)

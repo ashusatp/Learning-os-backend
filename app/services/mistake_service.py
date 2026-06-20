@@ -69,6 +69,17 @@ class MistakeService:
             raise NotFoundException(f"Subtopic not found: {subtopic_id}")
         return await self.mistake_repository.get_by_subtopic(subtopic_id, resolved)
 
+    async def get_mistakes_by_subtopic_paginated(
+        self, subtopic_id: UUID, resolved: bool | None, page: int, page_size: int
+    ):
+        subtopic = await self.subtopic_repository.get_by_id(subtopic_id)
+        if not subtopic:
+            raise NotFoundException(f"Subtopic not found: {subtopic_id}")
+        offset = (page - 1) * page_size
+        items, total = await self.mistake_repository.get_by_subtopic_paginated(subtopic_id, resolved, page_size, offset)
+        total_pages = (total + page_size - 1) // page_size
+        return {"items": items, "total": total, "page": page, "page_size": page_size, "total_pages": total_pages}
+
     async def get_mistakes_by_goal(self, goal_id: UUID, resolved: bool | None = None):
         return await self.mistake_repository.get_by_goal(goal_id, resolved)
 
