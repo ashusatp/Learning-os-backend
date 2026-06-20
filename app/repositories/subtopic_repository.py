@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.subtopic import SubTopic
 
@@ -15,13 +16,21 @@ class SubTopicRepository:
         self.db = db
 
     async def get_by_id(self, subtopic_id: UUID):
-        result = await self.db.get(SubTopic, subtopic_id)
-        return result
+        query = (
+            select(SubTopic)
+            .options(selectinload(SubTopic.files))
+            .where(SubTopic.id == subtopic_id)
+        )
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
 
     async def get_by_topic(self, topic_id: UUID):
-        query = select(SubTopic).where(
-            SubTopic.topic_id == topic_id
-        ).order_by(SubTopic.order, SubTopic.created_at)
+        query = (
+            select(SubTopic)
+            .options(selectinload(SubTopic.files))
+            .where(SubTopic.topic_id == topic_id)
+            .order_by(SubTopic.order, SubTopic.created_at)
+        )
         result = await self.db.execute(query)
         return result.scalars().all()
 

@@ -27,6 +27,25 @@ class UpdatePerformanceRequest(BaseModel):
     mistake_count: int
 
 
+class SaveNotesRequest(BaseModel):
+    notes_html: str | None = None
+    sketch_data_url: str | None = None
+    whiteboard_data_url: str | None = None
+
+
+class SubtopicFileResponse(BaseModel):
+    id: UUID
+    subtopic_id: UUID
+    name: str
+    original_name: str
+    content_type: str
+    size: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class SubTopicResponse(BaseModel):
     id: UUID
     topic_id: UUID
@@ -40,6 +59,10 @@ class SubTopicResponse(BaseModel):
     questions_solved: int
     questions_correct: int
     mistake_count: int
+    notes_html: str | None
+    sketch_data_url: str | None
+    whiteboard_data_url: str | None
+    files: list[SubtopicFileResponse] = []
     created_at: datetime
     updated_at: datetime
 

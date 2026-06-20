@@ -45,6 +45,11 @@ class SubTopic(Base):
 
     mistake_count = Column(Integer, nullable=False, default=0)
 
+    # Notes content
+    notes_html = Column(Text, nullable=True)
+    sketch_data_url = Column(Text, nullable=True)
+    whiteboard_data_url = Column(Text, nullable=True)
+
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -52,4 +57,10 @@ class SubTopic(Base):
     topic = relationship(
         "Topic",
         back_populates="subtopics",
+    )
+
+    files = relationship(
+        "SubtopicFile",
+        back_populates="subtopic",
+        cascade="all, delete-orphan",
     )
