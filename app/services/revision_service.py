@@ -539,6 +539,19 @@ class RevisionService:
             "completion_rate_30d": round(completed_30d / max(scheduled_30d, 1) * 100, 1),
         }
 
+    # ── Profile ──
+
+    async def get_profile_stats(self, user_id: UUID):
+        """Get aggregated profile stats for the user."""
+        profile = await self.revision_repository.get_profile_stats(user_id)
+        settings = await self.revision_repository.get_user_settings(user_id)
+
+        profile["daily_streak"] = settings.daily_streak if settings else 0
+        profile["longest_streak"] = settings.longest_streak if settings else 0
+        profile["streak_freezes"] = settings.streak_freezes_remaining if settings else 0
+
+        return profile
+
     # ── Calendar ──
 
     async def get_calendar_data(self, user_id: UUID, year: int, month: int):
@@ -560,6 +573,63 @@ class RevisionService:
                 "scheduled": scheduled.get(d, 0),
             }
         return {"dates": dates, "year": year, "month": month}
+
+    async def get_activity_heatmap(self, user_id: UUID, months: int = 6):
+        """Get daily completed revision counts for the past N months."""
+        now = datetime.now(timezone.utc)
+        start = now - timedelta(days=months * 31)
+
+        completed, _ = await self.revision_repository.get_calendar_data_for_user(
+            user_id, start, now,
+        )
+        # completed is {date_str: count}
+        return {"activity": completed, "start_date": str(start.date()), "end_date": str(now.date())}
+
+    async def get_calendar_date_items(self, user_id: UUID, date_str: str):
+        """Get scheduled and completed revision items for a specific date (IST)."""
+        from app.core.timezone import USER_TZ
+
+        year, month, day = map(int, date_str.split("-"))
+        local_start = datetime(year, month, day, 0, 0, 0, tzinfo=USER_TZ)
+        local_end = datetime(year, month, day, 23, 59, 59, 999999, tzinfo=USER_TZ)
+        utc_start = local_start.astimezone(timezone.utc)
+        utc_end = local_end.astimezone(timezone.utc)
+
+        scheduled_rows, completed_rows = await self.revision_repository.get_items_for_date(
+            user_id, utc_start, utc_end
+        )
+
+        scheduled = []
+        for row in scheduled_rows:
+            schedule = row[0]
+            scheduled.append({
+                "schedule_id": str(schedule.id),
+                "subtopic_id": str(schedule.subtopic_id),
+                "subtopic_name": row[1],
+                "mastery_level": row[2].value if hasattr(row[2], "value") else row[2],
+                "topic_name": row[6],
+                "subject_name": row[7],
+                "goal_id": str(row[10]),
+                "goal_title": row[11],
+                "next_revision_at": schedule.next_revision_at.isoformat(),
+                "current_interval_days": schedule.current_interval_days,
+            })
+
+        completed = []
+        for row in completed_rows:
+            completed.append({
+                "subtopic_id": str(row[0]),
+                "subtopic_name": row[1],
+                "mastery_level": row[2].value if hasattr(row[2], "value") else row[2],
+                "topic_name": row[3],
+                "subject_name": row[4],
+                "goal_id": str(row[5]),
+                "goal_title": row[6],
+                "quality_rating": row[7],
+                "completed_at": row[8].isoformat(),
+            })
+
+        return {"date": date_str, "scheduled": scheduled, "completed": completed}
 
     # ── Logs ──
 
@@ -762,13 +832,13 @@ class RevisionService:
         }
 
     async def _update_daily_streak(self, user_id: UUID, goal_id: UUID | None):
-        """Increment daily streak if this is the first completion today."""
+        """Increment daily streak if this is the first completion today (user-level)."""
         if not goal_id:
             return
 
-        completed_today = await self.revision_repository.count_completed_today(goal_id)
-        # If this is the first completion today (count is 0 before our commit),
-        # we increment the streak. The count is already 1 because we just created the log.
+        completed_today = await self.revision_repository.count_completed_today_for_user(user_id)
+        # If this is the first completion today (count is already 1 because we just created the log),
+        # we increment the streak.
         if completed_today <= 1:
             settings = await self.revision_repository.get_user_settings(user_id)
             if not settings:

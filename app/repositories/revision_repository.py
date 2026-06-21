@@ -164,6 +164,11 @@ class RevisionRepository:
             .where(
                 Goal.user_id == user_id,
                 RevisionLog.scheduled_for >= since,
+                RevisionLog.event_type.in_([
+                    RevisionEventType.COMPLETED,
+                    RevisionEventType.MISSED,
+                    RevisionEventType.SKIPPED,
+                ]),
             )
         )
         result = await self.db.execute(query)
@@ -216,6 +221,69 @@ class RevisionRepository:
         scheduled = {str(row.day): row.count for row in scheduled_result.all()}
 
         return completed, scheduled
+
+    async def get_items_for_date(self, user_id: UUID, date_start: datetime, date_end: datetime):
+        """Get scheduled revisions for a specific date range, plus completed logs."""
+        # Scheduled items whose next_revision_at falls on this date
+        scheduled_query = (
+            select(
+                RevisionSchedule,
+                SubTopic.name.label("subtopic_name"),
+                SubTopic.mastery_level,
+                SubTopic.mistake_count,
+                SubTopic.exam_frequency,
+                SubTopic.marks_per_question,
+                Topic.name.label("topic_name"),
+                Subject.name.label("subject_name"),
+                SubTopic.topic_id,
+                Topic.subject_id,
+                Subject.goal_id,
+                Goal.title.label("goal_title"),
+            )
+            .join(SubTopic, RevisionSchedule.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionSchedule.is_active == True,
+                RevisionSchedule.next_revision_at >= date_start,
+                RevisionSchedule.next_revision_at < date_end,
+            )
+            .order_by(RevisionSchedule.next_revision_at.asc())
+        )
+        result = await self.db.execute(scheduled_query)
+        scheduled_rows = result.all()
+
+        # Completed items on this date
+        completed_query = (
+            select(
+                RevisionLog.subtopic_id,
+                SubTopic.name.label("subtopic_name"),
+                SubTopic.mastery_level,
+                Topic.name.label("topic_name"),
+                Subject.name.label("subject_name"),
+                Subject.goal_id,
+                Goal.title.label("goal_title"),
+                RevisionLog.quality_rating,
+                RevisionLog.completed_at,
+            )
+            .join(SubTopic, RevisionLog.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionLog.event_type == RevisionEventType.COMPLETED,
+                RevisionLog.completed_at >= date_start,
+                RevisionLog.completed_at < date_end,
+            )
+            .order_by(RevisionLog.completed_at.asc())
+        )
+        completed_result = await self.db.execute(completed_query)
+        completed_rows = completed_result.all()
+
+        return scheduled_rows, completed_rows
 
     async def count_overdue_before_for_user(self, user_id: UUID, before: datetime):
         query = (
@@ -304,6 +372,11 @@ class RevisionRepository:
             .where(
                 Subject.goal_id == goal_id,
                 RevisionLog.scheduled_for >= since,
+                RevisionLog.event_type.in_([
+                    RevisionEventType.COMPLETED,
+                    RevisionEventType.MISSED,
+                    RevisionEventType.SKIPPED,
+                ]),
             )
         )
         result = await self.db.execute(query)
@@ -411,3 +484,87 @@ class RevisionRepository:
         )
         result = await self.db.execute(query)
         return {row[0]: row[1] for row in result.all()}
+
+    async def get_profile_stats(self, user_id: UUID):
+        """Aggregate profile stats across all goals for a user."""
+        from app.models.enum import MasteryLevel as ML
+
+        # Count goals
+        goal_count = await self.db.execute(
+            select(func.count()).select_from(Goal).where(Goal.user_id == user_id)
+        )
+
+        # Count subjects
+        subject_count = await self.db.execute(
+            select(func.count()).select_from(Subject)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(Goal.user_id == user_id)
+        )
+
+        # Count topics
+        topic_count = await self.db.execute(
+            select(func.count()).select_from(Topic)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(Goal.user_id == user_id)
+        )
+
+        # Count subtopics + mastery distribution
+        subtopic_base = (
+            select(SubTopic.mastery_level, func.count().label("cnt"))
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(Goal.user_id == user_id)
+            .group_by(SubTopic.mastery_level)
+        )
+        mastery_result = await self.db.execute(subtopic_base)
+        mastery_dist = {row[0].value if hasattr(row[0], 'value') else str(row[0]): row[1] for row in mastery_result.all()}
+
+        total_subtopics = sum(mastery_dist.values())
+
+        # Total revisions completed (all time)
+        total_revisions = await self.db.execute(
+            select(func.count()).select_from(RevisionLog)
+            .join(SubTopic, RevisionLog.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionLog.event_type == RevisionEventType.COMPLETED,
+            )
+        )
+
+        # Active schedules count
+        active_schedules = await self.db.execute(
+            select(func.count()).select_from(RevisionSchedule)
+            .join(SubTopic, RevisionSchedule.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionSchedule.is_active == True,
+            )
+        )
+
+        # Average confidence across all subtopics
+        avg_confidence = await self.db.execute(
+            select(func.avg(SubTopic.confidence_level))
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(Goal.user_id == user_id)
+        )
+
+        return {
+            "goal_count": goal_count.scalar() or 0,
+            "subject_count": subject_count.scalar() or 0,
+            "topic_count": topic_count.scalar() or 0,
+            "subtopic_count": total_subtopics,
+            "mastery_distribution": mastery_dist,
+            "total_revisions": total_revisions.scalar() or 0,
+            "active_schedules": active_schedules.scalar() or 0,
+            "avg_confidence": round((avg_confidence.scalar() or 0) * 100, 1),
+        }

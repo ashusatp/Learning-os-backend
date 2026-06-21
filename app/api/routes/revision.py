@@ -84,6 +84,32 @@ async def get_revision_calendar(
     return await service.get_calendar_data(user.id, year, month)
 
 
+@router.get("/revisions/calendar/{date}")
+async def get_revision_calendar_date(
+    date: str,
+    user: User = Depends(get_current_user),
+    service: RevisionService = Depends(get_revision_service),
+):
+    return await service.get_calendar_date_items(user.id, date)
+
+
+@router.get("/revisions/activity")
+async def get_activity_heatmap(
+    months: int = Query(6, ge=1, le=12),
+    user: User = Depends(get_current_user),
+    service: RevisionService = Depends(get_revision_service),
+):
+    return await service.get_activity_heatmap(user.id, months)
+
+
+@router.get("/profile/stats")
+async def get_profile_stats(
+    user: User = Depends(get_current_user),
+    service: RevisionService = Depends(get_revision_service),
+):
+    return await service.get_profile_stats(user.id)
+
+
 # ── Schedule Management ──
 
 @router.post(
