@@ -17,6 +17,8 @@ class UpdateSubTopicRequest(BaseModel):
     order: int | None = None
     mastery_level: MasteryLevel | None = None
     confidence_level: float | None = None
+    exam_frequency: int | None = None
+    marks_per_question: int | None = None
 
 
 class ReorderSubTopicsRequest(BaseModel):
@@ -116,6 +118,8 @@ class SubTopicResponse(BaseModel):
     questions_solved: int
     questions_correct: int
     mistake_count: int
+    exam_frequency: int
+    marks_per_question: int
     notes_html: str | None
     sketch_data_url: str | None
     whiteboard_data_url: str | None

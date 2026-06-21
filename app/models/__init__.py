@@ -10,3 +10,6 @@ from app.models.question import Question
 from app.models.question_option import QuestionOption
 from app.models.mistake import Mistake
 from app.models.issue import Issue
+from app.models.revision_schedule import RevisionSchedule
+from app.models.revision_log import RevisionLog
+from app.models.user_revision_settings import UserRevisionSettings

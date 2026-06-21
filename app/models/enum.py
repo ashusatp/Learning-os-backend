@@ -30,3 +30,17 @@ class MistakeType(str, Enum):
     MISREAD = "MISREAD"
     TIME_PRESSURE = "TIME_PRESSURE"
     OTHER = "OTHER"
+
+
+class RevisionEventType(str, Enum):
+    COMPLETED = "COMPLETED"
+    MISSED = "MISSED"
+    SKIPPED = "SKIPPED"
+    RESCHEDULED = "RESCHEDULED"
+
+
+class QualityRating(str, Enum):
+    AGAIN = "AGAIN"
+    HARD = "HARD"
+    GOOD = "GOOD"
+    EASY = "EASY"

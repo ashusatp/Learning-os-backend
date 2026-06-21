@@ -82,3 +82,21 @@ class SubTopic(Base):
         back_populates="subtopic",
         cascade="all, delete-orphan",
     )
+
+    # Exam weightage
+    exam_frequency = Column(Integer, nullable=False, default=0)
+
+    marks_per_question = Column(Integer, nullable=False, default=0)
+
+    revision_schedule = relationship(
+        "RevisionSchedule",
+        back_populates="subtopic",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    revision_logs = relationship(
+        "RevisionLog",
+        back_populates="subtopic",
+        cascade="all, delete-orphan",
+    )

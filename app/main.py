@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import configs
 from app.core.logger import setup_logger
 from app.exceptions.register import register_exception_handlers
-from app.api.routes import auth, health, user, goal, subject, topic, subtopic, question, mistake, account, ai, issue
+from app.api.routes import auth, health, user, goal, subject, topic, subtopic, question, mistake, account, ai, issue, revision
 
 setup_logger()
 
@@ -39,3 +39,4 @@ app.include_router(mistake.goal_router, prefix="/api/v1")
 app.include_router(account.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 app.include_router(issue.router, prefix="/api/v1")
+app.include_router(revision.router, prefix="/api/v1")
