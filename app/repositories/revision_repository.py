@@ -2,16 +2,17 @@ import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 
+from app.core.timezone import today_start_utc
 from app.models.revision_schedule import RevisionSchedule
 from app.models.revision_log import RevisionLog
 from app.models.user_revision_settings import UserRevisionSettings
 from app.models.subtopic import SubTopic
 from app.models.topic import Topic
 from app.models.subject import Subject
+from app.models.goal import Goal
 from app.models.enum import RevisionEventType
 
 
@@ -64,10 +65,15 @@ class RevisionRepository:
                 SubTopic.marks_per_question,
                 Topic.name.label("topic_name"),
                 Subject.name.label("subject_name"),
+                SubTopic.topic_id,
+                Topic.subject_id,
+                Subject.goal_id,
+                Goal.title.label("goal_title"),
             )
             .join(SubTopic, RevisionSchedule.subtopic_id == SubTopic.id)
             .join(Topic, SubTopic.topic_id == Topic.id)
             .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
             .where(
                 Subject.goal_id == goal_id,
                 RevisionSchedule.is_active == True,
@@ -77,6 +83,108 @@ class RevisionRepository:
         )
         result = await self.db.execute(query)
         return result.all()
+
+    async def get_queue_for_user(self, user_id: UUID, upcoming_days: int = 3):
+        now = datetime.now(timezone.utc)
+        upcoming_cutoff = now + timedelta(days=upcoming_days)
+
+        query = (
+            select(
+                RevisionSchedule,
+                SubTopic.name.label("subtopic_name"),
+                SubTopic.mastery_level,
+                SubTopic.mistake_count,
+                SubTopic.exam_frequency,
+                SubTopic.marks_per_question,
+                Topic.name.label("topic_name"),
+                Subject.name.label("subject_name"),
+                SubTopic.topic_id,
+                Topic.subject_id,
+                Subject.goal_id,
+                Goal.title.label("goal_title"),
+            )
+            .join(SubTopic, RevisionSchedule.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionSchedule.is_active == True,
+                RevisionSchedule.next_revision_at <= upcoming_cutoff,
+            )
+            .order_by(RevisionSchedule.next_revision_at.asc())
+        )
+        result = await self.db.execute(query)
+        return result.all()
+
+    async def count_completed_today_for_user(self, user_id: UUID):
+        start_of_day = today_start_utc()
+
+        query = (
+            select(func.count())
+            .select_from(RevisionLog)
+            .join(SubTopic, RevisionLog.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionLog.event_type == RevisionEventType.COMPLETED,
+                RevisionLog.completed_at >= start_of_day,
+            )
+        )
+        result = await self.db.execute(query)
+        return result.scalar()
+
+    async def count_completed_in_range_for_user(self, user_id: UUID, since: datetime):
+        query = (
+            select(func.count())
+            .select_from(RevisionLog)
+            .join(SubTopic, RevisionLog.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionLog.event_type == RevisionEventType.COMPLETED,
+                RevisionLog.completed_at >= since,
+            )
+        )
+        result = await self.db.execute(query)
+        return result.scalar()
+
+    async def count_scheduled_in_range_for_user(self, user_id: UUID, since: datetime):
+        query = (
+            select(func.count())
+            .select_from(RevisionLog)
+            .join(SubTopic, RevisionLog.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionLog.scheduled_for >= since,
+            )
+        )
+        result = await self.db.execute(query)
+        return result.scalar()
+
+    async def count_overdue_before_for_user(self, user_id: UUID, before: datetime):
+        query = (
+            select(func.count())
+            .select_from(RevisionSchedule)
+            .join(SubTopic, RevisionSchedule.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionSchedule.is_active == True,
+                RevisionSchedule.next_revision_at < before,
+            )
+        )
+        result = await self.db.execute(query)
+        return result.scalar()
 
     # ── Logs ──
 
@@ -105,8 +213,7 @@ class RevisionRepository:
         return result.scalars().all()
 
     async def count_completed_today(self, goal_id: UUID):
-        now = datetime.now(timezone.utc)
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_of_day = today_start_utc()
 
         query = (
             select(func.count())
@@ -154,6 +261,57 @@ class RevisionRepository:
         result = await self.db.execute(query)
         return result.scalar()
 
+    async def count_completed_in_date_range(self, goal_id: UUID, start: datetime, end: datetime):
+        query = (
+            select(func.count())
+            .select_from(RevisionLog)
+            .join(SubTopic, RevisionLog.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .where(
+                Subject.goal_id == goal_id,
+                RevisionLog.event_type == RevisionEventType.COMPLETED,
+                RevisionLog.completed_at >= start,
+                RevisionLog.completed_at <= end,
+            )
+        )
+        result = await self.db.execute(query)
+        return result.scalar()
+
+    async def count_scheduled_in_date_range(self, goal_id: UUID, start: datetime, end: datetime):
+        """Count revision logs that were scheduled in a date range."""
+        query = (
+            select(func.count())
+            .select_from(RevisionLog)
+            .join(SubTopic, RevisionLog.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .where(
+                Subject.goal_id == goal_id,
+                RevisionLog.scheduled_for >= start,
+                RevisionLog.scheduled_for <= end,
+            )
+        )
+        result = await self.db.execute(query)
+        return result.scalar()
+
+    async def count_overdue_before(self, goal_id: UUID, before: datetime):
+        """Count active schedules with next_revision_at before a given datetime."""
+        query = (
+            select(func.count())
+            .select_from(RevisionSchedule)
+            .join(SubTopic, RevisionSchedule.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .where(
+                Subject.goal_id == goal_id,
+                RevisionSchedule.is_active == True,
+                RevisionSchedule.next_revision_at < before,
+            )
+        )
+        result = await self.db.execute(query)
+        return result.scalar()
+
     # ── User Revision Settings ──
 
     async def get_user_settings(self, user_id: UUID):
@@ -169,6 +327,18 @@ class RevisionRepository:
     async def update_user_settings(self, settings: UserRevisionSettings):
         await self.db.flush()
         return settings
+
+    # ── Goal lookup ──
+
+    async def get_goal_id_for_subtopic(self, subtopic_id: UUID):
+        query = (
+            select(Subject.goal_id)
+            .join(Topic, Subject.id == Topic.subject_id)
+            .join(SubTopic, Topic.id == SubTopic.topic_id)
+            .where(SubTopic.id == subtopic_id)
+        )
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
 
     # ── Weightage normalization ──
 

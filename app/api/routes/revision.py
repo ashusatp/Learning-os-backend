@@ -18,6 +18,7 @@ from app.schema.revision_schema import (
     UpdateRevisionSettingsRequest,
     UserRevisionSettingsResponse,
 )
+from app.schema.subtopic_schema import SubTopicResponse
 from app.services.revision_service import RevisionService
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,21 @@ router = APIRouter(tags=["Revisions"])
 # ── Queue & Stats ──
 
 @router.get(
+    "/revisions/queue",
+    response_model=RevisionQueueResponse,
+)
+async def get_global_revision_queue(
+    user: User = Depends(get_current_user),
+    service: RevisionService = Depends(get_revision_service),
+):
+    await service.check_and_reset_streak_global(user.id)
+
+    queue = await service.get_global_queue(user.id)
+    stats = await service.get_global_stats(user.id, queue=queue)
+    return {**queue, "stats": stats}
+
+
+@router.get(
     "/goals/{goal_id}/revisions/queue",
     response_model=RevisionQueueResponse,
 )
@@ -36,8 +52,11 @@ async def get_revision_queue(
     user: User = Depends(get_current_user),
     service: RevisionService = Depends(get_revision_service),
 ):
+    # Lazy streak check — reset if user missed yesterday
+    await service.check_and_reset_streak(user.id, goal_id)
+
     queue = await service.get_queue(goal_id)
-    stats = await service.get_stats(goal_id, user.id)
+    stats = await service.get_stats(goal_id, user.id, queue=queue)
     return {**queue, "stats": stats}
 
 
@@ -92,9 +111,10 @@ async def complete_revision(
     user: User = Depends(get_current_user),
     service: RevisionService = Depends(get_revision_service),
 ):
-    schedule, log = await service.complete_revision(
+    schedule, log, promotion_suggestion, penalty_applied = await service.complete_revision(
         schedule_id,
         quality_rating=payload.quality_rating,
+        user_id=user.id,
         revision_notes=payload.revision_notes,
     )
     return {
@@ -103,6 +123,8 @@ async def complete_revision(
         "next_interval_days": schedule.current_interval_days,
         "new_ease_factor": schedule.ease_factor,
         "next_revision_at": schedule.next_revision_at,
+        "promotion_suggestion": promotion_suggestion,
+        "penalty_applied": penalty_applied,
     }
 
 
@@ -195,3 +217,30 @@ async def update_revision_settings(
 ):
     data = payload.model_dump(exclude_unset=True)
     return await service.update_settings(user.id, **data)
+
+
+# ── Mastery Promotion ──
+
+@router.post(
+    "/subtopics/{subtopic_id}/promote-mastery",
+    response_model=SubTopicResponse,
+)
+async def promote_mastery(
+    subtopic_id: UUID,
+    new_level: str = Query(..., description="Target mastery level"),
+    user: User = Depends(get_current_user),
+    service: RevisionService = Depends(get_revision_service),
+):
+    return await service.promote_mastery(subtopic_id, new_level)
+
+
+# ── Cron / Admin endpoints ──
+
+@router.post("/goals/{goal_id}/revisions/process-missed")
+async def process_missed_revisions(
+    goal_id: UUID,
+    user: User = Depends(get_current_user),
+    service: RevisionService = Depends(get_revision_service),
+):
+    count = await service.process_missed_revisions(goal_id)
+    return {"processed": count}

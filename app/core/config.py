@@ -32,6 +32,9 @@ class Configs(BaseSettings):
     AI_RATE_LIMIT_PER_MINUTE: int = 10
     AI_RATE_LIMIT_PER_DAY: int = 200
 
+    # Timezone for day boundaries (revisions, streaks)
+    TIMEZONE: str = "Asia/Kolkata"
+
     model_config = SettingsConfigDict(
         env_file=".env",
     )

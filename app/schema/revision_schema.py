@@ -86,6 +86,10 @@ class UpdateRevisionSettingsRequest(BaseModel):
 class RevisionQueueItem(BaseModel):
     schedule_id: UUID
     subtopic_id: UUID
+    topic_id: UUID
+    subject_id: UUID
+    goal_id: UUID
+    goal_title: str
     subtopic_name: str
     topic_name: str
     subject_name: str
@@ -119,9 +123,28 @@ class RevisionStatsResponse(BaseModel):
     completion_rate_30d: float
 
 
+class PromotionSuggestion(BaseModel):
+    subtopic_id: str
+    subtopic_name: str
+    current_level: str
+    suggested_level: str
+    consecutive_successes: int
+
+
+class PenaltyApplied(BaseModel):
+    days_overdue: int
+    confidence_penalty: int
+    mastery_dropped: int
+    old_mastery: str
+    new_mastery: str | None
+    interval_multiplier: float
+
+
 class RevisionCompleteResponse(BaseModel):
     schedule: RevisionScheduleResponse
     log: RevisionLogResponse
     next_interval_days: int
     new_ease_factor: float
     next_revision_at: datetime
+    promotion_suggestion: PromotionSuggestion | None = None
+    penalty_applied: PenaltyApplied | None = None
