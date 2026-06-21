@@ -72,6 +72,18 @@ async def get_revision_stats(
     return await service.get_stats(goal_id, user.id)
 
 
+# ── Calendar ──
+
+@router.get("/revisions/calendar")
+async def get_revision_calendar(
+    year: int = Query(...),
+    month: int = Query(..., ge=1, le=12),
+    user: User = Depends(get_current_user),
+    service: RevisionService = Depends(get_revision_service),
+):
+    return await service.get_calendar_data(user.id, year, month)
+
+
 # ── Schedule Management ──
 
 @router.post(

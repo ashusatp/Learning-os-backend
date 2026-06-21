@@ -169,6 +169,54 @@ class RevisionRepository:
         result = await self.db.execute(query)
         return result.scalar()
 
+    async def get_calendar_data_for_user(self, user_id: UUID, start: datetime, end: datetime):
+        """Get completed and scheduled revision counts per day for a date range."""
+        # Completed revisions grouped by date (in IST)
+        ist_completed = func.timezone('Asia/Kolkata', RevisionLog.completed_at)
+        completed_query = (
+            select(
+                func.date(ist_completed).label("day"),
+                func.count().label("count"),
+            )
+            .join(SubTopic, RevisionLog.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionLog.event_type == RevisionEventType.COMPLETED,
+                RevisionLog.completed_at >= start,
+                RevisionLog.completed_at <= end,
+            )
+            .group_by(func.date(ist_completed))
+        )
+        completed_result = await self.db.execute(completed_query)
+        completed = {str(row.day): row.count for row in completed_result.all()}
+
+        # Scheduled (upcoming) revisions grouped by date (in IST)
+        ist_scheduled = func.timezone('Asia/Kolkata', RevisionSchedule.next_revision_at)
+        scheduled_query = (
+            select(
+                func.date(ist_scheduled).label("day"),
+                func.count().label("count"),
+            )
+            .join(SubTopic, RevisionSchedule.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
+            .where(
+                Goal.user_id == user_id,
+                RevisionSchedule.is_active == True,
+                RevisionSchedule.next_revision_at >= start,
+                RevisionSchedule.next_revision_at <= end,
+            )
+            .group_by(func.date(ist_scheduled))
+        )
+        scheduled_result = await self.db.execute(scheduled_query)
+        scheduled = {str(row.day): row.count for row in scheduled_result.all()}
+
+        return completed, scheduled
+
     async def count_overdue_before_for_user(self, user_id: UUID, before: datetime):
         query = (
             select(func.count())

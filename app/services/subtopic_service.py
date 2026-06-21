@@ -296,6 +296,8 @@ class SubTopicService:
             "total_mistakes": total_mistakes,
             "unresolved_mistakes": total_mistakes - resolved_mistakes,
             "resolved_mistakes": resolved_mistakes,
+            "exam_frequency": subtopic.exam_frequency,
+            "marks_per_question": subtopic.marks_per_question,
             "created_at": subtopic.created_at,
             "updated_at": subtopic.updated_at,
         }

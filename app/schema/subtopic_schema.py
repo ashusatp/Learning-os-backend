@@ -96,6 +96,8 @@ class SubtopicStatsResponse(BaseModel):
     total_mistakes: int
     unresolved_mistakes: int
     resolved_mistakes: int
+    exam_frequency: int
+    marks_per_question: int
     created_at: datetime
     updated_at: datetime
 
@@ -103,6 +105,8 @@ class SubtopicStatsResponse(BaseModel):
 class UpdateStatsRequest(BaseModel):
     mastery_level: MasteryLevel | None = None
     confidence_level: float | None = None
+    exam_frequency: int | None = None
+    marks_per_question: int | None = None
 
 
 class SubTopicResponse(BaseModel):

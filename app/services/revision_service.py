@@ -376,9 +376,9 @@ class RevisionService:
 
     # ── Queue ──
 
-    def _build_queue_items(self, rows, max_weightage: int, now, today_start, today_end, has_goal_info: bool = False):
+    def _build_queue_items(self, rows, max_weightage: int, now, today_start, today_end):
         """Build queue item dicts from raw DB rows.
-        If has_goal_info=True, rows include goal_id and goal_title at indices 10 and 11."""
+        Rows include goal_id and goal_title at indices 10 and 11."""
         overdue = []
         due_today = []
         upcoming = []
@@ -395,12 +395,8 @@ class RevisionService:
             topic_id = row[8]
             subject_id = row[9]
 
-            if has_goal_info:
-                goal_id = row[10]
-                goal_title = row[11]
-            else:
-                goal_id = None
-                goal_title = ""
+            goal_id = row[10]
+            goal_title = row[11]
 
             overdue_seconds = max(0.0, (now - schedule.next_revision_at).total_seconds())
             days_overdue_precise = overdue_seconds / 86400.0
@@ -469,7 +465,7 @@ class RevisionService:
         today_end = today_end_utc()
         rows = await self.revision_repository.get_queue_for_goal(goal_id)
         max_weightage = await self.revision_repository.get_max_weightage_for_goal(goal_id)
-        return self._build_queue_items(rows, max_weightage, now, today_start, today_end, has_goal_info=True)
+        return self._build_queue_items(rows, max_weightage, now, today_start, today_end)
 
     async def get_global_queue(self, user_id: UUID):
         now = datetime.now(timezone.utc)
@@ -483,7 +479,7 @@ class RevisionService:
                 (r[4] * r[5] for r in rows),  # exam_frequency * marks_per_question
                 default=1,
             ) or 1
-        return self._build_queue_items(rows, max_weightage, now, today_start, today_end, has_goal_info=True)
+        return self._build_queue_items(rows, max_weightage, now, today_start, today_end)
 
     async def get_stats(self, goal_id: UUID, user_id: UUID, queue: dict | None = None):
         now = datetime.now(timezone.utc)
@@ -542,6 +538,28 @@ class RevisionService:
             "completion_rate_7d": round(completed_7d / max(scheduled_7d, 1) * 100, 1),
             "completion_rate_30d": round(completed_30d / max(scheduled_30d, 1) * 100, 1),
         }
+
+    # ── Calendar ──
+
+    async def get_calendar_data(self, user_id: UUID, year: int, month: int):
+        from calendar import monthrange
+        first_day = datetime(year, month, 1, tzinfo=timezone.utc)
+        last_day_num = monthrange(year, month)[1]
+        last_day = datetime(year, month, last_day_num, 23, 59, 59, tzinfo=timezone.utc)
+
+        completed, scheduled = await self.revision_repository.get_calendar_data_for_user(
+            user_id, first_day, last_day,
+        )
+
+        # Merge into a single dict per date
+        all_dates = set(completed.keys()) | set(scheduled.keys())
+        dates = {}
+        for d in all_dates:
+            dates[d] = {
+                "completed": completed.get(d, 0),
+                "scheduled": scheduled.get(d, 0),
+            }
+        return {"dates": dates, "year": year, "month": month}
 
     # ── Logs ──
 
@@ -888,12 +906,6 @@ class RevisionService:
             yday_end = yesterday_end_utc()
             tday_start = today_start_utc()
 
-            completed_yesterday = await self.revision_repository.count_completed_in_range_for_user(user_id, yday_start)
-            # Rough check: count_completed_in_range_for_user counts from yday_start onward,
-            # but we need just yesterday. Use the bounded version approach:
-            # For simplicity, check if any overdue items exist and no completions yesterday.
-            # We can check completed_today_for_user with yesterday's range.
-            # Actually, let's just use the user-level overdue count:
             overdue_count = await self.revision_repository.count_overdue_before_for_user(user_id, tday_start)
 
             if overdue_count == 0:
