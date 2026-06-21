@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.exceptions.custom_exceptions import NotFoundException
 from app.models.goal import Goal
 from app.repositories.goal_repository import GoalRepository
+from app.repositories.revision_repository import RevisionRepository
 from app.repositories.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
@@ -13,9 +14,10 @@ logger = logging.getLogger(__name__)
 
 class GoalService:
 
-    def __init__(self, goal_repository: GoalRepository, user_repository: UserRepository):
+    def __init__(self, goal_repository: GoalRepository, user_repository: UserRepository, revision_repository: RevisionRepository):
         self.goal_repository = goal_repository
         self.user_repository = user_repository
+        self.revision_repository = revision_repository
 
     async def create_goal(
         self,
@@ -147,10 +149,14 @@ class GoalService:
             goal = await self.get_goal(goal_id)
             goal.is_archived = archive
             await self.goal_repository.update(goal)
+
+            # Pause all revision schedules when archiving, resume when unarchiving
+            await self.revision_repository.bulk_set_active_for_goal(goal_id, is_active=not archive)
+
             await db.commit()
             await db.refresh(goal)
             action = "archived" if archive else "unarchived"
-            logger.info(f"Goal {action}: {goal_id}")
+            logger.info(f"Goal {action}: {goal_id} (revisions {'paused' if archive else 'resumed'})")
             return goal
         except NotFoundException:
             raise

@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.timezone import today_start_utc
@@ -76,6 +76,7 @@ class RevisionRepository:
             .join(Goal, Subject.goal_id == Goal.id)
             .where(
                 Subject.goal_id == goal_id,
+                Goal.is_archived == False,
                 RevisionSchedule.is_active == True,
                 RevisionSchedule.next_revision_at <= upcoming_cutoff,
             )
@@ -109,6 +110,7 @@ class RevisionRepository:
             .join(Goal, Subject.goal_id == Goal.id)
             .where(
                 Goal.user_id == user_id,
+                Goal.is_archived == False,
                 RevisionSchedule.is_active == True,
                 RevisionSchedule.next_revision_at <= upcoming_cutoff,
             )
@@ -211,6 +213,7 @@ class RevisionRepository:
             .join(Goal, Subject.goal_id == Goal.id)
             .where(
                 Goal.user_id == user_id,
+                Goal.is_archived == False,
                 RevisionSchedule.is_active == True,
                 RevisionSchedule.next_revision_at >= start,
                 RevisionSchedule.next_revision_at <= end,
@@ -246,6 +249,7 @@ class RevisionRepository:
             .join(Goal, Subject.goal_id == Goal.id)
             .where(
                 Goal.user_id == user_id,
+                Goal.is_archived == False,
                 RevisionSchedule.is_active == True,
                 RevisionSchedule.next_revision_at >= date_start,
                 RevisionSchedule.next_revision_at < date_end,
@@ -295,6 +299,7 @@ class RevisionRepository:
             .join(Goal, Subject.goal_id == Goal.id)
             .where(
                 Goal.user_id == user_id,
+                Goal.is_archived == False,
                 RevisionSchedule.is_active == True,
                 RevisionSchedule.next_revision_at < before,
             )
@@ -424,8 +429,10 @@ class RevisionRepository:
             .join(SubTopic, RevisionSchedule.subtopic_id == SubTopic.id)
             .join(Topic, SubTopic.topic_id == Topic.id)
             .join(Subject, Topic.subject_id == Subject.id)
+            .join(Goal, Subject.goal_id == Goal.id)
             .where(
                 Subject.goal_id == goal_id,
+                Goal.is_archived == False,
                 RevisionSchedule.is_active == True,
                 RevisionSchedule.next_revision_at < before,
             )
@@ -568,3 +575,21 @@ class RevisionRepository:
             "active_schedules": active_schedules.scalar() or 0,
             "avg_confidence": round((avg_confidence.scalar() or 0) * 100, 1),
         }
+
+    # ── Bulk archive operations ──
+
+    async def bulk_set_active_for_goal(self, goal_id: UUID, is_active: bool):
+        """Pause or resume all revision schedules under a goal."""
+        subtopic_ids_query = (
+            select(SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .where(Subject.goal_id == goal_id)
+        )
+        stmt = (
+            update(RevisionSchedule)
+            .where(RevisionSchedule.subtopic_id.in_(subtopic_ids_query))
+            .values(is_active=is_active)
+        )
+        await self.db.execute(stmt)
+        await self.db.flush()
