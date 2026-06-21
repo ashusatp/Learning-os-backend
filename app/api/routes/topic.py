@@ -29,9 +29,10 @@ async def create_topic(
 @router.get("", response_model=list[TopicResponse])
 async def get_topics(
     subject_id: UUID,
+    include_archived: bool = False,
     service: TopicService = Depends(get_topic_service),
 ):
-    return await service.get_topics_by_subject(subject_id)
+    return await service.get_topics_by_subject(subject_id, include_archived=include_archived)
 
 
 @router.put("/reorder", response_model=list[TopicResponse])
@@ -63,6 +64,16 @@ async def update_topic(
         topic_id,
         **payload.model_dump(exclude_unset=True),
     )
+
+
+@router.patch("/{topic_id}/archive", response_model=TopicResponse)
+async def archive_topic(
+    subject_id: UUID,
+    topic_id: UUID,
+    archive: bool = True,
+    service: TopicService = Depends(get_topic_service),
+):
+    return await service.archive_topic(topic_id, archive)
 
 
 @router.delete("/{topic_id}", status_code=204)

@@ -71,14 +71,14 @@ class TopicService:
 
         return topic
 
-    async def get_topics_by_subject(self, subject_id: UUID):
+    async def get_topics_by_subject(self, subject_id: UUID, include_archived: bool = False):
 
         subject = await self.subject_repository.get_by_id(subject_id)
 
         if not subject:
             raise NotFoundException(f"Subject not found: {subject_id}")
 
-        return await self.topic_repository.get_by_subject(subject_id)
+        return await self.topic_repository.get_by_subject(subject_id, include_archived=include_archived)
 
     async def update_topic(self, topic_id: UUID, **kwargs):
 
@@ -167,4 +167,26 @@ class TopicService:
         except Exception:
             await db.rollback()
             logger.exception(f"Error while deleting topic: {topic_id}")
+            raise
+
+    async def archive_topic(self, topic_id: UUID, archive: bool = True):
+        db = self.topic_repository.db
+        try:
+            topic = await self.get_topic(topic_id)
+            topic.is_archived = archive
+            await self.topic_repository.update(topic)
+            await db.commit()
+            await db.refresh(topic)
+            action = "archived" if archive else "unarchived"
+            logger.info(f"Topic {action}: {topic_id}")
+            return topic
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while archiving topic: {topic_id}")
+            raise
+        except Exception:
+            await db.rollback()
+            logger.exception(f"Error while archiving topic: {topic_id}")
             raise

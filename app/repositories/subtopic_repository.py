@@ -24,13 +24,15 @@ class SubTopicRepository:
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_by_topic(self, topic_id: UUID):
+    async def get_by_topic(self, topic_id: UUID, include_archived: bool = False):
         query = (
             select(SubTopic)
             .options(selectinload(SubTopic.files))
             .where(SubTopic.topic_id == topic_id)
-            .order_by(SubTopic.order, SubTopic.created_at)
         )
+        if not include_archived:
+            query = query.where(SubTopic.is_archived == False)
+        query = query.order_by(SubTopic.order, SubTopic.created_at)
         result = await self.db.execute(query)
         return result.scalars().all()
 

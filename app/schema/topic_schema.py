@@ -25,6 +25,7 @@ class TopicResponse(BaseModel):
     name: str
     description: str | None
     order: int
+    is_archived: bool
     created_at: datetime
     updated_at: datetime
 

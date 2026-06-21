@@ -3,6 +3,8 @@ import uuid as uuid_mod
 from pathlib import Path, PurePosixPath
 from typing import Optional
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import FileResponse
 
@@ -28,6 +30,14 @@ router = APIRouter(
     prefix="/issues",
     tags=["Issues"],
 )
+
+
+@router.get("", response_model=list[IssueResponse])
+async def get_issues(
+    current_user: User = Depends(get_current_user),
+    service: IssueService = Depends(get_issue_service),
+):
+    return await service.get_issues_by_user(current_user.id)
 
 
 @router.post("", response_model=IssueResponse, status_code=201)
@@ -89,6 +99,24 @@ async def create_issue(
         category=category,
         attachments=attachments,
     )
+
+
+@router.patch("/{issue_id}/resolve", response_model=IssueResponse)
+async def resolve_issue(
+    issue_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: IssueService = Depends(get_issue_service),
+):
+    return await service.resolve_issue(issue_id)
+
+
+@router.patch("/{issue_id}/reopen", response_model=IssueResponse)
+async def reopen_issue(
+    issue_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: IssueService = Depends(get_issue_service),
+):
+    return await service.reopen_issue(issue_id)
 
 
 @router.get("/attachments/{filename}")

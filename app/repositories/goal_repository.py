@@ -18,10 +18,11 @@ class GoalRepository:
         result = await self.db.get(Goal, goal_id)
         return result
 
-    async def get_by_user(self, user_id: UUID):
-        query = select(Goal).where(
-            Goal.user_id == user_id
-        ).order_by(Goal.created_at)
+    async def get_by_user(self, user_id: UUID, include_archived: bool = False):
+        query = select(Goal).where(Goal.user_id == user_id)
+        if not include_archived:
+            query = query.where(Goal.is_archived == False)
+        query = query.order_by(Goal.created_at)
         result = await self.db.execute(query)
         return result.scalars().all()
 

@@ -88,14 +88,14 @@ class SubTopicService:
 
         return subtopic
 
-    async def get_subtopics_by_topic(self, topic_id: UUID):
+    async def get_subtopics_by_topic(self, topic_id: UUID, include_archived: bool = False):
 
         topic = await self.topic_repository.get_by_id(topic_id)
 
         if not topic:
             raise NotFoundException(f"Topic not found: {topic_id}")
 
-        return await self.subtopic_repository.get_by_topic(topic_id)
+        return await self.subtopic_repository.get_by_topic(topic_id, include_archived=include_archived)
 
     async def update_subtopic(self, subtopic_id: UUID, **kwargs):
 
@@ -184,6 +184,28 @@ class SubTopicService:
         except Exception:
             await db.rollback()
             logger.exception(f"Error while deleting subtopic: {subtopic_id}")
+            raise
+
+    async def archive_subtopic(self, subtopic_id: UUID, archive: bool = True):
+        db = self.subtopic_repository.db
+        try:
+            subtopic = await self.get_subtopic(subtopic_id)
+            subtopic.is_archived = archive
+            await self.subtopic_repository.update(subtopic)
+            await db.commit()
+            await db.refresh(subtopic, ["files"])
+            action = "archived" if archive else "unarchived"
+            logger.info(f"SubTopic {action}: {subtopic_id}")
+            return subtopic
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while archiving subtopic: {subtopic_id}")
+            raise
+        except Exception:
+            await db.rollback()
+            logger.exception(f"Error while archiving subtopic: {subtopic_id}")
             raise
 
     async def record_revision(self, subtopic_id: UUID):

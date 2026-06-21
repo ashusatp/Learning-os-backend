@@ -29,9 +29,10 @@ async def create_subject(
 @router.get("", response_model=list[SubjectResponse])
 async def get_subjects(
     goal_id: UUID,
+    include_archived: bool = False,
     service: SubjectService = Depends(get_subject_service),
 ):
-    return await service.get_subjects_by_goal(goal_id)
+    return await service.get_subjects_by_goal(goal_id, include_archived=include_archived)
 
 
 @router.get("/{subject_id}", response_model=SubjectResponse)
@@ -54,6 +55,16 @@ async def update_subject(
         subject_id,
         **payload.model_dump(exclude_unset=True),
     )
+
+
+@router.patch("/{subject_id}/archive", response_model=SubjectResponse)
+async def archive_subject(
+    goal_id: UUID,
+    subject_id: UUID,
+    archive: bool = True,
+    service: SubjectService = Depends(get_subject_service),
+):
+    return await service.archive_subject(subject_id, archive)
 
 
 @router.delete("/{subject_id}", status_code=204)

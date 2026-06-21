@@ -24,6 +24,7 @@ class GoalResponse(BaseModel):
     description: str | None
     target_exam: str | None
     target_year: int | None
+    is_archived: bool
     created_at: datetime
     updated_at: datetime
 

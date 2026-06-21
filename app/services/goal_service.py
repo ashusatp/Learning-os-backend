@@ -73,14 +73,14 @@ class GoalService:
 
         return goal
 
-    async def get_goals_by_user(self, user_id: UUID):
+    async def get_goals_by_user(self, user_id: UUID, include_archived: bool = False):
 
         user = await self.user_repository.get_by_id(user_id)
 
         if not user:
             raise NotFoundException(f"User not found: {user_id}")
 
-        return await self.goal_repository.get_by_user(user_id)
+        return await self.goal_repository.get_by_user(user_id, include_archived=include_archived)
 
     async def update_goal(self, goal_id: UUID, **kwargs):
 
@@ -139,4 +139,26 @@ class GoalService:
         except Exception:
             await db.rollback()
             logger.exception(f"Error while deleting goal: {goal_id}")
+            raise
+
+    async def archive_goal(self, goal_id: UUID, archive: bool = True):
+        db = self.goal_repository.db
+        try:
+            goal = await self.get_goal(goal_id)
+            goal.is_archived = archive
+            await self.goal_repository.update(goal)
+            await db.commit()
+            await db.refresh(goal)
+            action = "archived" if archive else "unarchived"
+            logger.info(f"Goal {action}: {goal_id}")
+            return goal
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while archiving goal: {goal_id}")
+            raise
+        except Exception:
+            await db.rollback()
+            logger.exception(f"Error while archiving goal: {goal_id}")
             raise

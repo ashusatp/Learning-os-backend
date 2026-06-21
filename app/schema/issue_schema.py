@@ -19,6 +19,7 @@ class IssueResponse(BaseModel):
     category: str
     status: str
     attachments: list[AttachmentInfo]
+    resolved_at: datetime | None
     created_at: datetime
 
     class Config:

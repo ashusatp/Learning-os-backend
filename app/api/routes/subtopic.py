@@ -56,9 +56,10 @@ async def create_subtopic(
 @router.get("", response_model=list[SubTopicResponse])
 async def get_subtopics(
     topic_id: UUID,
+    include_archived: bool = False,
     service: SubTopicService = Depends(get_subtopic_service),
 ):
-    return await service.get_subtopics_by_topic(topic_id)
+    return await service.get_subtopics_by_topic(topic_id, include_archived=include_archived)
 
 
 @router.put("/reorder", response_model=list[SubTopicResponse])
@@ -90,6 +91,16 @@ async def update_subtopic(
         subtopic_id,
         **payload.model_dump(exclude_unset=True),
     )
+
+
+@router.patch("/{subtopic_id}/archive", response_model=SubTopicResponse)
+async def archive_subtopic(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    archive: bool = True,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.archive_subtopic(subtopic_id, archive)
 
 
 @router.delete("/{subtopic_id}", status_code=204)

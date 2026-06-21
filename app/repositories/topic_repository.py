@@ -18,10 +18,11 @@ class TopicRepository:
         result = await self.db.get(Topic, topic_id)
         return result
 
-    async def get_by_subject(self, subject_id: UUID):
-        query = select(Topic).where(
-            Topic.subject_id == subject_id
-        ).order_by(Topic.order, Topic.created_at)
+    async def get_by_subject(self, subject_id: UUID, include_archived: bool = False):
+        query = select(Topic).where(Topic.subject_id == subject_id)
+        if not include_archived:
+            query = query.where(Topic.is_archived == False)
+        query = query.order_by(Topic.order, Topic.created_at)
         result = await self.db.execute(query)
         return result.scalars().all()
 

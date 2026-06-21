@@ -71,14 +71,14 @@ class SubjectService:
 
         return subject
 
-    async def get_subjects_by_goal(self, goal_id: UUID):
+    async def get_subjects_by_goal(self, goal_id: UUID, include_archived: bool = False):
 
         goal = await self.goal_repository.get_by_id(goal_id)
 
         if not goal:
             raise NotFoundException(f"Goal not found: {goal_id}")
 
-        return await self.subject_repository.get_by_goal(goal_id)
+        return await self.subject_repository.get_by_goal(goal_id, include_archived=include_archived)
 
     async def update_subject(self, subject_id: UUID, **kwargs):
 
@@ -137,4 +137,26 @@ class SubjectService:
         except Exception:
             await db.rollback()
             logger.exception(f"Error while deleting subject: {subject_id}")
+            raise
+
+    async def archive_subject(self, subject_id: UUID, archive: bool = True):
+        db = self.subject_repository.db
+        try:
+            subject = await self.get_subject(subject_id)
+            subject.is_archived = archive
+            await self.subject_repository.update(subject)
+            await db.commit()
+            await db.refresh(subject)
+            action = "archived" if archive else "unarchived"
+            logger.info(f"Subject {action}: {subject_id}")
+            return subject
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while archiving subject: {subject_id}")
+            raise
+        except Exception:
+            await db.rollback()
+            logger.exception(f"Error while archiving subject: {subject_id}")
             raise

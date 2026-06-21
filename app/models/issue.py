@@ -25,4 +25,6 @@ class Issue(Base):
 
     attachments = Column(JSON, nullable=False, default=list)
 
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

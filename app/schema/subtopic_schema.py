@@ -115,6 +115,7 @@ class SubTopicResponse(BaseModel):
     name: str
     description: str | None
     order: int
+    is_archived: bool
     revision_count: int
     last_revised_at: datetime | None
     confidence_level: float
