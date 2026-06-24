@@ -45,3 +45,9 @@ class User(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+
+    campaigns = relationship(
+        "RevisionCampaign",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

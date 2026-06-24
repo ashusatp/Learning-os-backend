@@ -14,3 +14,6 @@ from app.models.revision_schedule import RevisionSchedule
 from app.models.revision_log import RevisionLog
 from app.models.user_revision_settings import UserRevisionSettings
 from app.models.sketch_board import SketchBoardModel
+from app.models.campaign import RevisionCampaign
+from app.models.campaign_scope import CampaignScope
+from app.models.campaign_item import CampaignItem

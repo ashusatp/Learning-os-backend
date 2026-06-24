@@ -44,3 +44,21 @@ class QualityRating(str, Enum):
     HARD = "HARD"
     GOOD = "GOOD"
     EASY = "EASY"
+
+
+class CampaignType(str, Enum):
+    SUBTOPIC_REVISION = "SUBTOPIC_REVISION"
+    MISTAKE_REVIEW = "MISTAKE_REVIEW"
+    PYQ_PRACTICE = "PYQ_PRACTICE"
+
+
+class CampaignScopeType(str, Enum):
+    SUBJECT = "SUBJECT"
+    TOPIC = "TOPIC"
+
+
+class CampaignStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    PAUSED = "PAUSED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
