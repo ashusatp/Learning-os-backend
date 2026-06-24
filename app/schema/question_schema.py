@@ -91,5 +91,13 @@ class QuestionResponse(BaseModel):
         from_attributes = True
 
 
+class GoalQuestionResponse(QuestionResponse):
+    subject_id: UUID
+    subject_name: str
+    topic_id: UUID
+    topic_name: str
+    subtopic_name: str
+
+
 class ReorderQuestionsRequest(BaseModel):
     ordered_ids: list[UUID]

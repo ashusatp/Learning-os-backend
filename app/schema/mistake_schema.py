@@ -38,3 +38,11 @@ class MistakeResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class GoalMistakeResponse(MistakeResponse):
+    subject_id: UUID
+    subject_name: str
+    topic_id: UUID
+    topic_name: str
+    subtopic_name: str

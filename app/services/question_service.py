@@ -45,7 +45,9 @@ class QuestionService:
 
             await self.question_repository.create(question)
             await db.commit()
-            await db.refresh(question)
+
+            # Re-fetch with options eagerly loaded to avoid lazy-load outside async context
+            question = await self.question_repository.get_by_id(question.id)
 
             logger.info(f"Question created for subtopic {subtopic_id}")
             return question
@@ -84,6 +86,44 @@ class QuestionService:
         total_pages = (total + page_size - 1) // page_size
         return {"items": items, "total": total, "page": page, "page_size": page_size, "total_pages": total_pages}
 
+    async def get_questions_by_goal_paginated(self, goal_id: UUID, page: int, page_size: int, **filters):
+        offset = (page - 1) * page_size
+        rows, total = await self.question_repository.get_by_goal_paginated(
+            goal_id, page_size, offset, **filters
+        )
+        total_pages = (total + page_size - 1) // page_size
+
+        items = []
+        for row in rows:
+            question = row[0]
+            item = {
+                "id": question.id,
+                "subtopic_id": question.subtopic_id,
+                "question_type": question.question_type,
+                "text_html": question.text_html,
+                "explanation_html": question.explanation_html,
+                "difficulty": question.difficulty,
+                "marks": question.marks,
+                "negative_marks": question.negative_marks,
+                "numerical_answer": question.numerical_answer,
+                "numerical_tolerance": question.numerical_tolerance,
+                "answer_html": question.answer_html,
+                "is_pyq": question.is_pyq,
+                "tags": question.tags or [],
+                "order": question.order,
+                "options": question.options,
+                "created_at": question.created_at,
+                "updated_at": question.updated_at,
+                "subject_id": row[1],
+                "subject_name": row[2],
+                "topic_id": row[3],
+                "topic_name": row[4],
+                "subtopic_name": row[5],
+            }
+            items.append(item)
+
+        return {"items": items, "total": total, "page": page, "page_size": page_size, "total_pages": total_pages}
+
     async def update_question(self, question_id: UUID, **kwargs):
         db = self.question_repository.db
 
@@ -102,7 +142,8 @@ class QuestionService:
 
             await self.question_repository.update(question)
             await db.commit()
-            await db.refresh(question)
+
+            question = await self.question_repository.get_by_id(question.id)
 
             logger.info(f"Question updated: {question_id}")
             return question

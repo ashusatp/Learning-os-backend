@@ -8,6 +8,7 @@ from app.schema.mistake_schema import (
     CreateMistakeRequest,
     UpdateMistakeRequest,
     MistakeResponse,
+    GoalMistakeResponse,
 )
 from app.schema.pagination import PaginatedResponse
 from app.services.mistake_service import MistakeService
@@ -98,10 +99,27 @@ goal_router = APIRouter(
 )
 
 
-@goal_router.get("", response_model=list[MistakeResponse])
+@goal_router.get("", response_model=PaginatedResponse[GoalMistakeResponse])
 async def get_mistakes_by_goal(
     goal_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     resolved: bool | None = Query(None),
+    subject_id: UUID | None = Query(None),
+    topic_id: UUID | None = Query(None),
+    subtopic_id: UUID | None = Query(None),
+    mistake_type: str | None = Query(None),
     service: MistakeService = Depends(get_mistake_service),
 ):
-    return await service.get_mistakes_by_goal(goal_id, resolved)
+    filters = {}
+    if resolved is not None:
+        filters["resolved"] = resolved
+    if subject_id:
+        filters["subject_id"] = subject_id
+    if topic_id:
+        filters["topic_id"] = topic_id
+    if subtopic_id:
+        filters["subtopic_id"] = subtopic_id
+    if mistake_type:
+        filters["mistake_type"] = mistake_type
+    return await service.get_mistakes_by_goal_paginated(goal_id, page, page_size, **filters)

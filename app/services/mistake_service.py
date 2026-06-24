@@ -83,6 +83,40 @@ class MistakeService:
     async def get_mistakes_by_goal(self, goal_id: UUID, resolved: bool | None = None):
         return await self.mistake_repository.get_by_goal(goal_id, resolved)
 
+    async def get_mistakes_by_goal_paginated(self, goal_id: UUID, page: int, page_size: int, **filters):
+        offset = (page - 1) * page_size
+        rows, total = await self.mistake_repository.get_by_goal_paginated(
+            goal_id, page_size, offset, **filters
+        )
+        total_pages = (total + page_size - 1) // page_size
+
+        items = []
+        for row in rows:
+            mistake = row[0]
+            item = {
+                "id": mistake.id,
+                "subtopic_id": mistake.subtopic_id,
+                "question_id": mistake.question_id,
+                "mistake_type": mistake.mistake_type,
+                "description_html": mistake.description_html,
+                "correction_html": mistake.correction_html,
+                "tags": mistake.tags or [],
+                "is_resolved": mistake.is_resolved,
+                "resolved_at": mistake.resolved_at,
+                "revision_count": mistake.revision_count,
+                "last_revised_at": mistake.last_revised_at,
+                "created_at": mistake.created_at,
+                "updated_at": mistake.updated_at,
+                "subject_id": row[1],
+                "subject_name": row[2],
+                "topic_id": row[3],
+                "topic_name": row[4],
+                "subtopic_name": row[5],
+            }
+            items.append(item)
+
+        return {"items": items, "total": total, "page": page, "page_size": page_size, "total_pages": total_pages}
+
     async def update_mistake(self, mistake_id: UUID, **kwargs):
         db = self.mistake_repository.db
 

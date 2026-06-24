@@ -9,6 +9,7 @@ from app.schema.question_schema import (
     UpdateQuestionRequest,
     ReorderQuestionsRequest,
     QuestionResponse,
+    GoalQuestionResponse,
 )
 from app.schema.pagination import PaginatedResponse
 from app.services.question_service import QuestionService
@@ -85,3 +86,40 @@ async def delete_question(
     service: QuestionService = Depends(get_question_service),
 ):
     await service.delete_question(question_id)
+
+
+# ── Goal-scoped routes ──
+
+goal_router = APIRouter(
+    prefix="/goals/{goal_id}/questions",
+    tags=["Questions"],
+)
+
+
+@goal_router.get("", response_model=PaginatedResponse[GoalQuestionResponse])
+async def get_questions_by_goal(
+    goal_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    subject_id: UUID | None = Query(None),
+    topic_id: UUID | None = Query(None),
+    subtopic_id: UUID | None = Query(None),
+    question_type: str | None = Query(None),
+    difficulty: str | None = Query(None),
+    is_pyq: bool | None = Query(None),
+    service: QuestionService = Depends(get_question_service),
+):
+    filters = {}
+    if subject_id:
+        filters["subject_id"] = subject_id
+    if topic_id:
+        filters["topic_id"] = topic_id
+    if subtopic_id:
+        filters["subtopic_id"] = subtopic_id
+    if question_type:
+        filters["question_type"] = question_type
+    if difficulty:
+        filters["difficulty"] = difficulty
+    if is_pyq is not None:
+        filters["is_pyq"] = is_pyq
+    return await service.get_questions_by_goal_paginated(goal_id, page, page_size, **filters)

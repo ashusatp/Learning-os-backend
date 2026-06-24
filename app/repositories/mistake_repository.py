@@ -62,6 +62,71 @@ class MistakeRepository:
         result = await self.db.execute(query)
         return result.scalars().all()
 
+    async def get_by_goal_paginated(
+        self,
+        goal_id,
+        limit: int,
+        offset: int,
+        resolved: bool | None = None,
+        subject_id=None,
+        topic_id=None,
+        subtopic_id=None,
+        mistake_type=None,
+    ):
+        base = (
+            select(Mistake)
+            .join(SubTopic, Mistake.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .where(Subject.goal_id == goal_id)
+        )
+
+        if resolved is not None:
+            base = base.where(Mistake.is_resolved == resolved)
+        if subject_id:
+            base = base.where(Subject.id == subject_id)
+        if topic_id:
+            base = base.where(Topic.id == topic_id)
+        if subtopic_id:
+            base = base.where(SubTopic.id == subtopic_id)
+        if mistake_type:
+            base = base.where(Mistake.mistake_type == mistake_type)
+
+        count_result = await self.db.execute(
+            select(func.count()).select_from(base.subquery())
+        )
+        total = count_result.scalar()
+
+        ids_query = (
+            base.with_only_columns(Mistake.id)
+            .order_by(Mistake.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        ids_result = await self.db.execute(ids_query)
+        mistake_ids = [r[0] for r in ids_result.all()]
+
+        if not mistake_ids:
+            return [], total
+
+        query = (
+            select(
+                Mistake,
+                Subject.id.label("subject_id"),
+                Subject.name.label("subject_name"),
+                Topic.id.label("topic_id"),
+                Topic.name.label("topic_name"),
+                SubTopic.name.label("subtopic_name"),
+            )
+            .join(SubTopic, Mistake.subtopic_id == SubTopic.id)
+            .join(Topic, SubTopic.topic_id == Topic.id)
+            .join(Subject, Topic.subject_id == Subject.id)
+            .where(Mistake.id.in_(mistake_ids))
+            .order_by(Mistake.created_at.desc())
+        )
+        result = await self.db.execute(query)
+        return result.all(), total
+
     async def create(self, mistake: Mistake):
         self.db.add(mistake)
         await self.db.flush()
