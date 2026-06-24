@@ -2,7 +2,10 @@ from fastapi import APIRouter, Depends
 
 from app.api.dependencies.auth_dependency import get_auth_service, get_current_user
 from app.models.user import User
-from app.schema.auth_schema import SignupRequest, SigninRequest, AuthResponse, AuthUserResponse, OAuthCallbackRequest
+from app.schema.auth_schema import (
+    SignupRequest, SigninRequest, AuthResponse, AuthUserResponse,
+    OAuthCallbackRequest, ForgotPasswordRequest, ForgotPasswordResponse, ResetPasswordRequest,
+)
 from app.services.auth_service import AuthService
 
 router = APIRouter(
@@ -45,6 +48,22 @@ async def google_auth(
 ):
     result = await service.google_auth(code=payload.code)
     return result
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    service: AuthService = Depends(get_auth_service),
+):
+    return await service.forgot_password(email=payload.email)
+
+
+@router.post("/reset-password")
+async def reset_password(
+    payload: ResetPasswordRequest,
+    service: AuthService = Depends(get_auth_service),
+):
+    return await service.reset_password(token=payload.token, new_password=payload.new_password)
 
 
 @router.get("/me", response_model=AuthUserResponse)

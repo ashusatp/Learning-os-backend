@@ -13,3 +13,4 @@ from app.models.issue import Issue
 from app.models.revision_schedule import RevisionSchedule
 from app.models.revision_log import RevisionLog
 from app.models.user_revision_settings import UserRevisionSettings
+from app.models.sketch_board import SketchBoardModel

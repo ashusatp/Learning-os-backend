@@ -87,6 +87,33 @@ class FolderContentsResponse(BaseModel):
     files: list[SubtopicFileResponse]
 
 
+class SketchBoardResponse(BaseModel):
+    id: UUID
+    subtopic_id: UUID
+    name: str
+    data: str | None = None
+    order: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CreateSketchBoardRequest(BaseModel):
+    name: str
+    data: str | None = None
+
+
+class UpdateSketchBoardRequest(BaseModel):
+    name: str | None = None
+    data: str | None = None
+
+
+class RenameSketchBoardRequest(BaseModel):
+    name: str
+
+
 class SubtopicStatsResponse(BaseModel):
     mastery_level: MasteryLevel
     confidence_level: float
@@ -129,6 +156,7 @@ class SubTopicResponse(BaseModel):
     sketch_data_url: str | None
     whiteboard_data_url: str | None
     files: list[SubtopicFileResponse] = []
+    sketch_boards: list[SketchBoardResponse] = []
     created_at: datetime
     updated_at: datetime
 

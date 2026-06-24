@@ -28,6 +28,10 @@ from app.schema.subtopic_schema import (
     MoveFileRequest,
     RenameFileRequest,
     FolderContentsResponse,
+    SketchBoardResponse,
+    CreateSketchBoardRequest,
+    UpdateSketchBoardRequest,
+    RenameSketchBoardRequest,
 )
 from app.services.subtopic_service import SubTopicService
 
@@ -352,3 +356,79 @@ async def delete_folder(
     service: SubTopicService = Depends(get_subtopic_service),
 ):
     await service.delete_folder(folder_id)
+
+
+# ── Sketch Board endpoints ──
+
+
+@router.post(
+    "/{subtopic_id}/sketch-boards",
+    response_model=SketchBoardResponse,
+    status_code=201,
+)
+async def create_sketch_board(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    payload: CreateSketchBoardRequest,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.create_sketch_board(
+        subtopic_id=subtopic_id,
+        name=payload.name,
+        data=payload.data,
+    )
+
+
+@router.get("/{subtopic_id}/sketch-boards", response_model=list[SketchBoardResponse])
+async def list_sketch_boards(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.get_sketch_boards(subtopic_id)
+
+
+@router.get("/{subtopic_id}/sketch-boards/{board_id}", response_model=SketchBoardResponse)
+async def get_sketch_board(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    board_id: UUID,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.get_sketch_board(board_id)
+
+
+@router.put("/{subtopic_id}/sketch-boards/{board_id}", response_model=SketchBoardResponse)
+async def update_sketch_board(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    board_id: UUID,
+    payload: UpdateSketchBoardRequest,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.update_sketch_board(
+        board_id=board_id,
+        name=payload.name,
+        data=payload.data,
+    )
+
+
+@router.patch("/{subtopic_id}/sketch-boards/{board_id}/rename", response_model=SketchBoardResponse)
+async def rename_sketch_board(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    board_id: UUID,
+    payload: RenameSketchBoardRequest,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    return await service.rename_sketch_board(board_id, payload.name)
+
+
+@router.delete("/{subtopic_id}/sketch-boards/{board_id}", status_code=204)
+async def delete_sketch_board(
+    topic_id: UUID,
+    subtopic_id: UUID,
+    board_id: UUID,
+    service: SubTopicService = Depends(get_subtopic_service),
+):
+    await service.delete_sketch_board(board_id)

@@ -85,6 +85,12 @@ class SubTopic(Base):
         cascade="all, delete-orphan",
     )
 
+    sketch_boards = relationship(
+        "SketchBoardModel",
+        back_populates="subtopic",
+        cascade="all, delete-orphan",
+    )
+
     # Exam weightage
     exam_frequency = Column(Integer, nullable=False, default=0)
 

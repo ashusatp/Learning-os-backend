@@ -10,11 +10,13 @@ from app.exceptions.custom_exceptions import BadRequestException, NotFoundExcept
 from app.models.subtopic import SubTopic
 from app.models.subtopic_file import SubtopicFile
 from app.models.subtopic_folder import SubtopicFolder
+from app.models.sketch_board import SketchBoardModel
 from app.models.question import Question
 from app.models.mistake import Mistake
 from app.repositories.subtopic_repository import SubTopicRepository
 from app.repositories.subtopic_file_repository import SubtopicFileRepository
 from app.repositories.subtopic_folder_repository import SubtopicFolderRepository
+from app.repositories.sketch_board_repository import SketchBoardRepository
 from app.repositories.topic_repository import TopicRepository
 
 logger = logging.getLogger(__name__)
@@ -28,11 +30,13 @@ class SubTopicService:
         topic_repository: TopicRepository,
         file_repository: SubtopicFileRepository,
         folder_repository: SubtopicFolderRepository | None = None,
+        sketch_board_repository: SketchBoardRepository | None = None,
     ):
         self.subtopic_repository = subtopic_repository
         self.topic_repository = topic_repository
         self.file_repository = file_repository
         self.folder_repository = folder_repository
+        self.sketch_board_repository = sketch_board_repository
 
     async def create_subtopic(
         self,
@@ -60,7 +64,7 @@ class SubTopicService:
             await self.subtopic_repository.create(subtopic)
 
             await db.commit()
-            await db.refresh(subtopic, ["files"])
+            await db.refresh(subtopic, ["files", "sketch_boards"])
 
             logger.info(f"SubTopic created: {name} for topic {topic_id}")
 
@@ -111,7 +115,7 @@ class SubTopicService:
             await self.subtopic_repository.update(subtopic)
 
             await db.commit()
-            await db.refresh(subtopic, ["files"])
+            await db.refresh(subtopic, ["files", "sketch_boards"])
 
             logger.info(f"SubTopic updated: {subtopic_id}")
 
@@ -193,7 +197,7 @@ class SubTopicService:
             subtopic.is_archived = archive
             await self.subtopic_repository.update(subtopic)
             await db.commit()
-            await db.refresh(subtopic, ["files"])
+            await db.refresh(subtopic, ["files", "sketch_boards"])
             action = "archived" if archive else "unarchived"
             logger.info(f"SubTopic {action}: {subtopic_id}")
             return subtopic
@@ -221,7 +225,7 @@ class SubTopicService:
             await self.subtopic_repository.update(subtopic)
 
             await db.commit()
-            await db.refresh(subtopic, ["files"])
+            await db.refresh(subtopic, ["files", "sketch_boards"])
 
             logger.info(f"Revision recorded for subtopic: {subtopic_id}")
 
@@ -264,7 +268,7 @@ class SubTopicService:
             await self.subtopic_repository.update(subtopic)
 
             await db.commit()
-            await db.refresh(subtopic, ["files"])
+            await db.refresh(subtopic, ["files", "sketch_boards"])
 
             logger.info(f"Performance updated for subtopic: {subtopic_id}")
 
@@ -336,7 +340,7 @@ class SubTopicService:
 
             await self.subtopic_repository.update(subtopic)
             await db.commit()
-            await db.refresh(subtopic, ["files"])
+            await db.refresh(subtopic, ["files", "sketch_boards"])
 
             logger.info(f"Stats updated for subtopic: {subtopic_id}")
             return await self.get_stats(subtopic_id)
@@ -378,7 +382,7 @@ class SubTopicService:
             await self.subtopic_repository.update(subtopic)
 
             await db.commit()
-            await db.refresh(subtopic, ["files"])
+            await db.refresh(subtopic, ["files", "sketch_boards"])
 
             logger.info(f"Notes saved for subtopic: {subtopic_id}")
 
@@ -645,4 +649,131 @@ class SubTopicService:
         except SQLAlchemyError:
             await db.rollback()
             logger.exception(f"Database error while deleting folder: {folder_id}")
+            raise
+
+    # ── Sketch Boards ──
+
+    async def get_sketch_boards(self, subtopic_id: UUID):
+        await self.get_subtopic(subtopic_id)
+        return await self.sketch_board_repository.get_by_subtopic(subtopic_id)
+
+    async def get_sketch_board(self, board_id: UUID):
+        board = await self.sketch_board_repository.get_by_id(board_id)
+        if not board:
+            raise NotFoundException(f"Sketch board not found: {board_id}")
+        return board
+
+    async def create_sketch_board(
+        self,
+        subtopic_id: UUID,
+        name: str,
+        data: str | None = None,
+    ):
+        db = self.sketch_board_repository.db
+
+        try:
+            await self.get_subtopic(subtopic_id)
+
+            # Determine next order value
+            existing = await self.sketch_board_repository.get_by_subtopic(subtopic_id)
+            next_order = len(existing)
+
+            board = SketchBoardModel(
+                subtopic_id=subtopic_id,
+                name=name,
+                data=data,
+                order=next_order,
+            )
+
+            await self.sketch_board_repository.create(board)
+            await db.commit()
+            await db.refresh(board)
+
+            logger.info(f"Sketch board created: {name} for subtopic {subtopic_id}")
+            return board
+
+        except NotFoundException:
+            raise
+
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while creating sketch board: {name}")
+            raise
+
+        except Exception:
+            await db.rollback()
+            logger.exception(f"Error while creating sketch board: {name}")
+            raise
+
+    async def update_sketch_board(
+        self,
+        board_id: UUID,
+        name: str | None = None,
+        data: str | None = None,
+    ):
+        db = self.sketch_board_repository.db
+
+        try:
+            board = await self.get_sketch_board(board_id)
+
+            if name is not None:
+                board.name = name
+            if data is not None:
+                board.data = data
+
+            await self.sketch_board_repository.update(board)
+            await db.commit()
+            await db.refresh(board)
+
+            logger.info(f"Sketch board updated: {board_id}")
+            return board
+
+        except NotFoundException:
+            raise
+
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while updating sketch board: {board_id}")
+            raise
+
+        except Exception:
+            await db.rollback()
+            logger.exception(f"Error while updating sketch board: {board_id}")
+            raise
+
+    async def rename_sketch_board(self, board_id: UUID, name: str):
+        db = self.sketch_board_repository.db
+
+        try:
+            board = await self.get_sketch_board(board_id)
+            board.name = name
+            await self.sketch_board_repository.update(board)
+            await db.commit()
+            await db.refresh(board)
+
+            logger.info(f"Sketch board {board_id} renamed to {name}")
+            return board
+
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while renaming sketch board: {board_id}")
+            raise
+
+    async def delete_sketch_board(self, board_id: UUID):
+        db = self.sketch_board_repository.db
+
+        try:
+            board = await self.get_sketch_board(board_id)
+            await self.sketch_board_repository.delete(board)
+            await db.commit()
+
+            logger.info(f"Sketch board deleted: {board_id}")
+
+        except NotFoundException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception(f"Database error while deleting sketch board: {board_id}")
             raise

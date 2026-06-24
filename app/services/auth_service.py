@@ -11,7 +11,8 @@ from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schema.auth_schema import AuthUserResponse
 from app.utils.hashing import hash_password, verify_password
-from app.utils.jwt import create_access_token
+from app.core.config import configs
+from app.utils.jwt import create_access_token, create_reset_token, decode_reset_token
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,50 @@ class AuthService:
         token = create_access_token(user.id)
 
         return {"access_token": token, "user": AuthUserResponse.from_user(user)}
+
+    async def forgot_password(self, email: str):
+        user = await self.user_repository.get_by_email(email)
+
+        if not user:
+            raise BadRequestException("No account found with this email")
+
+        if not user.password_hash:
+            raise BadRequestException("This account uses Google sign-in. Please log in with Google.")
+
+        token = create_reset_token(user.id)
+        reset_link = f"{configs.FRONTEND_URL}/reset-password?token={token}"
+
+        logger.info(f"Password reset requested for: {email}")
+
+        return {"message": "Reset link generated", "reset_link": reset_link}
+
+    async def reset_password(self, token: str, new_password: str):
+        from uuid import UUID as PyUUID
+
+        db = self.user_repository.db
+
+        user_id_str = decode_reset_token(token)
+        if not user_id_str:
+            raise BadRequestException("Invalid or expired reset token")
+
+        try:
+            user = await self.user_repository.get_by_id(PyUUID(user_id_str))
+            if not user:
+                raise BadRequestException("User not found")
+
+            user.password_hash = hash_password(new_password)
+            await db.commit()
+
+            logger.info(f"Password reset successful for: {user.email}")
+
+            return {"message": "Password reset successfully"}
+
+        except BadRequestException:
+            raise
+        except SQLAlchemyError:
+            await db.rollback()
+            logger.exception("Database error during password reset")
+            raise
 
     async def google_auth(self, code: str):
         import httpx

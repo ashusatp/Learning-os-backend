@@ -18,7 +18,7 @@ class SubTopicRepository:
     async def get_by_id(self, subtopic_id: UUID):
         query = (
             select(SubTopic)
-            .options(selectinload(SubTopic.files))
+            .options(selectinload(SubTopic.files), selectinload(SubTopic.sketch_boards))
             .where(SubTopic.id == subtopic_id)
         )
         result = await self.db.execute(query)
@@ -27,7 +27,7 @@ class SubTopicRepository:
     async def get_by_topic(self, topic_id: UUID, include_archived: bool = False):
         query = (
             select(SubTopic)
-            .options(selectinload(SubTopic.files))
+            .options(selectinload(SubTopic.files), selectinload(SubTopic.sketch_boards))
             .where(SubTopic.topic_id == topic_id)
         )
         if not include_archived:
